@@ -3,6 +3,7 @@ package main
 import (
 	"log"
 	"net/http"
+	"os"
 
 	"github.com/tubes-cc/logistics/client"
 	"github.com/tubes-cc/logistics/internal/handler"
@@ -27,10 +28,13 @@ func main() {
 	}
 
 	// 2. Setup Clients (Inter-service communication)
-	// In a real scenario, these URLs would come from environment variables
-	trackingClient := client.NewHTTPTrackingClient("http://tracking-service:8080")
-	orderClient := client.NewHTTPOrderClient("http://order-service:8080")
-	authClient := client.NewHTTPAuthClient("http://auth-service:8080")
+	trackingURL := getEnv("TRACKING_SVC_URL", "http://tracking-service:8080")
+	orderURL := getEnv("ORDER_SVC_URL", "http://order-service:8080")
+	authURL := getEnv("AUTH_SVC_URL", "http://auth-service:8080")
+
+	trackingClient := client.NewHTTPTrackingClient(trackingURL)
+	orderClient := client.NewHTTPOrderClient(orderURL)
+	authClient := client.NewHTTPAuthClient(authURL)
 
 	// 3. Setup Service
 	hubService := hub.NewService(repo, trackingClient, orderClient)
@@ -52,9 +56,16 @@ func main() {
 	))
 
 	// 6. Start Server
-	port := ":8081"
+	port := ":" + getEnv("PORT", "8081")
 	log.Printf("Hub Service is running on port %s", port)
 	if err := http.ListenAndServe(port, mux); err != nil {
 		log.Fatalf("Failed to start server: %v", err)
 	}
+}
+
+func getEnv(key, fallback string) string {
+	if value, exists := os.LookupEnv(key); exists {
+		return value
+	}
+	return fallback
 }

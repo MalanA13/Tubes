@@ -65,8 +65,11 @@ func (s *Service) AssignCourier(ctx context.Context, resiID, courierID string) e
 		return fmt.Errorf("assign-courier: gagal ambil shipment: %w", err)
 	}
 
-	if shipment.Status != domain.StatusInTransit {
-		return fmt.Errorf("assign-courier: status saat ini '%s', harus 'IN_TRANSIT': %w",
+	// Karena Hub dan Courier menggunakan DB terpisah, resi yang baru masuk ke DB Courier
+	// akan memiliki status CREATED secara default dari CreateShipmentIfNotExists.
+	// Oleh karena itu, kita izinkan status CREATED atau IN_TRANSIT.
+	if shipment.Status != domain.StatusInTransit && shipment.Status != domain.StatusCreated {
+		return fmt.Errorf("assign-courier: status saat ini '%s', harus 'IN_TRANSIT' atau 'CREATED': %w",
 			shipment.Status, domain.ErrInvalidStatus)
 	}
 

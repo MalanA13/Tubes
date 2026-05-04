@@ -1,0 +1,45 @@
+version: '3.8'
+
+services:
+  hub:
+    build:
+      context: ../../
+      dockerfile: deployments/docker/hub.Dockerfile
+    image: logistics-hub:latest
+    container_name: logistics-hub
+    ports:
+      - "8081:8081"
+    environment:
+      - PORT=8081
+      - TRACKING_SVC_URL=http://mock-services:8080
+      - ORDER_SVC_URL=http://mock-services:8080
+      - AUTH_SVC_URL=http://mock-services:8080
+    networks:
+      - logistics-net
+
+  courier:
+    build:
+      context: ../../
+      dockerfile: deployments/docker/courier.Dockerfile
+    image: logistics-courier:latest
+    container_name: logistics-courier
+    ports:
+      - "8082:8082"
+    environment:
+      - PORT=8082
+      - TRACKING_SVC_URL=http://mock-services:8080
+      - ORDER_SVC_URL=http://mock-services:8080
+      - AUTH_SVC_URL=http://mock-services:8080
+    networks:
+      - logistics-net
+
+  mock-services:
+    image: hashicorp/http-echo
+    container_name: mock-services
+    command: -text='{"role":"admin"}' -listen=:8080
+    networks:
+      - logistics-net
+
+networks:
+  logistics-net:
+    driver: bridge
