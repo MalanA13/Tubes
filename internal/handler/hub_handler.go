@@ -6,7 +6,7 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/tubes-cc/logistics/hub"
+	"github.com/tubes-cc/logistics/internal/hub"
 )
 
 // HubHandler menangani semua HTTP request untuk Hub Service.

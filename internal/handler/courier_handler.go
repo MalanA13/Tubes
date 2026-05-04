@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/tubes-cc/logistics/courier"
+	"github.com/tubes-cc/logistics/internal/courier"
 	"github.com/tubes-cc/logistics/domain"
 )
 

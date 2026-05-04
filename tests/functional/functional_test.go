@@ -18,9 +18,9 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/tubes-cc/logistics/courier"
+	"github.com/tubes-cc/logistics/internal/courier"
 	"github.com/tubes-cc/logistics/domain"
-	"github.com/tubes-cc/logistics/hub"
+	"github.com/tubes-cc/logistics/internal/hub"
 	sqliterepo "github.com/tubes-cc/logistics/infrastructure/sqlite"
 )
 
