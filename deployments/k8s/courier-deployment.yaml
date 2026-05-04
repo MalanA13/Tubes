@@ -1,0 +1,46 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: courier-deployment
+  labels:
+    app: courier-service
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: courier-service
+  template:
+    metadata:
+      labels:
+        app: courier-service
+    spec:
+      containers:
+      - name: courier-service
+        # Jika menggunakan Azure (ACR), ubah image di bawah ini menjadi:
+        # image: namakampusacr.azurecr.io/logistics-courier:latest
+        image: logistics-courier:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8082
+        env:
+        - name: PORT
+          value: "8082"
+        - name: TRACKING_SVC_URL
+          value: "http://tracking-service:8080"
+        - name: ORDER_SVC_URL
+          value: "http://order-service:8080"
+        - name: AUTH_SVC_URL
+          value: "http://auth-service:8080"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: courier-service
+spec:
+  selector:
+    app: courier-service
+  ports:
+    - protocol: TCP
+      port: 8082
+      targetPort: 8082
+  type: ClusterIP
