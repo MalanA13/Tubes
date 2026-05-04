@@ -24,7 +24,7 @@ pipeline {
             steps {
                 echo 'Running Unit Tests...'
                 // Pastikan Golang sudah terinstall di agent Jenkins
-                sh 'go test -v ./tests/unit/...'
+                sh 'go test -v ./internal/...'
             }
         }
 
