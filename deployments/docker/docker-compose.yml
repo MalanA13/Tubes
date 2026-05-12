@@ -8,9 +8,9 @@ services:
     image: logistics-hub:latest
     container_name: logistics-hub
     ports:
-      - "8081:8081"
+      - "8084:8084"
     environment:
-      - PORT=8081
+      - PORT=8084
       - TRACKING_SVC_URL=http://mock-services:8080
       - ORDER_SVC_URL=http://mock-services:8080
       - AUTH_SVC_URL=http://mock-services:8080
@@ -24,9 +24,9 @@ services:
     image: logistics-courier:latest
     container_name: logistics-courier
     ports:
-      - "8082:8082"
+      - "8085:8085"
     environment:
-      - PORT=8082
+      - PORT=8085
       - TRACKING_SVC_URL=http://mock-services:8080
       - ORDER_SVC_URL=http://mock-services:8080
       - AUTH_SVC_URL=http://mock-services:8080

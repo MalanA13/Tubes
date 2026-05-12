@@ -23,6 +23,6 @@ RUN apk --no-cache add ca-certificates tzdata
 
 COPY --from=builder /app/hub .
 
-EXPOSE 8081
+EXPOSE 8084
 
 CMD ["./hub"]

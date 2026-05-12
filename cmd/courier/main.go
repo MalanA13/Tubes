@@ -6,10 +6,10 @@ import (
 	"os"
 
 	"github.com/tubes-cc/logistics/client"
+	sqliterepo "github.com/tubes-cc/logistics/infrastructure/sqlite"
 	"github.com/tubes-cc/logistics/internal/courier"
 	"github.com/tubes-cc/logistics/internal/handler"
 	"github.com/tubes-cc/logistics/internal/middleware"
-	sqliterepo "github.com/tubes-cc/logistics/infrastructure/sqlite"
 )
 
 func main() {
@@ -49,13 +49,13 @@ func main() {
 	mux.HandleFunc("/courier/assign", authMiddleware.Authenticate(
 		authMiddleware.RequireRole("admin", courierHandler.AssignCourier),
 	))
-	
+
 	mux.HandleFunc("/courier/delivery-status", authMiddleware.Authenticate(
 		authMiddleware.RequireRole("courier", courierHandler.UpdateDeliveryStatus),
 	))
 
 	// 6. Start Server
-	port := ":" + getEnv("PORT", "8082")
+	port := ":" + getEnv("PORT", "8085")
 	log.Printf("Courier Service is running on port %s", port)
 	if err := http.ListenAndServe(port, mux); err != nil {
 		log.Fatalf("Failed to start server: %v", err)

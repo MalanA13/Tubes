@@ -21,10 +21,10 @@ spec:
         image: logistics-courier:latest
         imagePullPolicy: IfNotPresent
         ports:
-        - containerPort: 8082
+        - containerPort: 8085
         env:
         - name: PORT
-          value: "8082"
+          value: "8085"
         - name: TRACKING_SVC_URL
           value: "http://tracking-service:8080"
         - name: ORDER_SVC_URL
@@ -41,6 +41,6 @@ spec:
     app: courier-service
   ports:
     - protocol: TCP
-      port: 8082
-      targetPort: 8082
+      port: 8085
+      targetPort: 8085
   type: ClusterIP

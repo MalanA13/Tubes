@@ -6,10 +6,10 @@ import (
 	"os"
 
 	"github.com/tubes-cc/logistics/client"
+	sqliterepo "github.com/tubes-cc/logistics/infrastructure/sqlite"
 	"github.com/tubes-cc/logistics/internal/handler"
 	"github.com/tubes-cc/logistics/internal/hub"
 	"github.com/tubes-cc/logistics/internal/middleware"
-	sqliterepo "github.com/tubes-cc/logistics/infrastructure/sqlite"
 )
 
 func main() {
@@ -50,13 +50,13 @@ func main() {
 	mux.HandleFunc("/hub/scan-in", authMiddleware.Authenticate(
 		authMiddleware.RequireRole("admin", hubHandler.ScanIn),
 	))
-	
+
 	mux.HandleFunc("/hub/scan-out", authMiddleware.Authenticate(
 		authMiddleware.RequireRole("admin", hubHandler.ScanOut),
 	))
 
 	// 6. Start Server
-	port := ":" + getEnv("PORT", "8081")
+	port := ":" + getEnv("PORT", "8084") // Hub service uses port 8084
 	log.Printf("Hub Service is running on port %s", port)
 	if err := http.ListenAndServe(port, mux); err != nil {
 		log.Fatalf("Failed to start server: %v", err)

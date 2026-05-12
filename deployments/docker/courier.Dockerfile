@@ -22,6 +22,6 @@ RUN apk --no-cache add ca-certificates tzdata
 
 COPY --from=builder /app/courier .
 
-EXPOSE 8082
+EXPOSE 8085
 
 CMD ["./courier"]

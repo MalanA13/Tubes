@@ -22,10 +22,10 @@ spec:
         # Gunakan imagePullPolicy: Never atau IfNotPresent jika test di minikube lokal
         imagePullPolicy: IfNotPresent
         ports:
-        - containerPort: 8081
+        - containerPort: 8084
         env:
         - name: PORT
-          value: "8081"
+          value: "8084"
         - name: TRACKING_SVC_URL
           value: "http://tracking-service:8080"
         - name: ORDER_SVC_URL
@@ -42,6 +42,6 @@ spec:
     app: hub-service
   ports:
     - protocol: TCP
-      port: 8081
-      targetPort: 8081
+      port: 8084
+      targetPort: 8084
   type: ClusterIP
