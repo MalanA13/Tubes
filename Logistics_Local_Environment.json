@@ -1,0 +1,33 @@
+{
+	"id": "e4f5a6b7-8c9d-0e1f-2a3b-4c5d6e7f8a9b",
+	"name": "Logistics Tubes - Local Environment",
+	"values": [
+		{
+			"key": "hub_url",
+			"value": "http://localhost:8084",
+			"type": "default",
+			"enabled": true
+		},
+		{
+			"key": "courier_url",
+			"value": "http://localhost:8085",
+			"type": "default",
+			"enabled": true
+		},
+		{
+			"key": "resi_id",
+			"value": "RESI-PM-001",
+			"type": "default",
+			"enabled": true
+		},
+		{
+			"key": "auth_token",
+			"value": "token_admin_123",
+			"type": "default",
+			"enabled": true
+		}
+	],
+	"_postman_variable_scope": "environment",
+	"_postman_exported_at": "2026-05-12T17:35:00.000Z",
+	"_postman_exported_using": "Postman/10.0.0"
+}

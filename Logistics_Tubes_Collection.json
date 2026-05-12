@@ -1,0 +1,152 @@
+{
+	"info": {
+		"_postman_id": "b3e5b7b0-8c29-4b68-8a8b-1b9f69b82a39",
+		"name": "Logistics Microservices - Tubes CC",
+		"description": "Collection untuk melakukan testing API Hub dan Courier Service secara berurutan sesuai alur bisnis pengiriman barang.",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "1. Hub Service",
+			"item": [
+				{
+					"name": "Scan-In (Paket Masuk Hub)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n    \"resi_id\": \"{{resi_id}}\",\r\n    \"hub_id\": \"HUB-JAKARTA-01\"\r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{hub_url}}/hub/scan-in",
+							"host": [
+								"{{hub_url}}"
+							],
+							"path": [
+								"hub",
+								"scan-in"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Scan-Out (Paket Keluar Hub)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n    \"resi_id\": \"{{resi_id}}\",\r\n    \"hub_id\": \"HUB-JAKARTA-01\"\r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{hub_url}}/hub/scan-out",
+							"host": [
+								"{{hub_url}}"
+							],
+							"path": [
+								"hub",
+								"scan-out"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "2. Courier Service",
+			"item": [
+				{
+					"name": "Assign Courier (Penugasan Kurir)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n    \"resi_id\": \"{{resi_id}}\",\r\n    \"courier_id\": \"KURIR-BUDI-123\"\r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{courier_url}}/courier/assign",
+							"host": [
+								"{{courier_url}}"
+							],
+							"path": [
+								"courier",
+								"assign"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Update Delivery Status (Selesai Dikirim)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer token_courier_123",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n    \"resi_id\": \"{{resi_id}}\",\r\n    \"status\": \"DELIVERED\",\r\n    \"proof_url\": \"https://storage.buktifoto.com/resi/123.jpg\"\r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{courier_url}}/courier/delivery-status",
+							"host": [
+								"{{courier_url}}"
+							],
+							"path": [
+								"courier",
+								"delivery-status"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		}
+	]
+}

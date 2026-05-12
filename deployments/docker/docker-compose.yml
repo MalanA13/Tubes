@@ -34,9 +34,13 @@ services:
       - logistics-net
 
   mock-services:
-    image: hashicorp/http-echo
+    image: node:18-alpine
     container_name: mock-services
-    command: -text='{"role":"admin"}' -listen=:8080
+    volumes:
+      - ./mock-server.js:/app/mock-server.js
+    command: node /app/mock-server.js
+    ports:
+      - "5678:8080"
     networks:
       - logistics-net
 

@@ -1,6 +1,8 @@
 .env
 *.db
 *.sqlite
+*.db-shm
+*.db-wal
 *.log
 bin/
 vendor/

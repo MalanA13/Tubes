@@ -6,12 +6,12 @@ WORKDIR /app
 RUN apk add --no-cache gcc musl-dev
 
 COPY go.mod go.sum ./
-RUN go mod download
+COPY vendor/ vendor/
 
 COPY . .
 
 # Build aplikasi courier dengan CGO_ENABLED=1
-RUN CGO_ENABLED=1 GOOS=linux go build -o courier ./cmd/courier
+RUN CGO_ENABLED=1 GOOS=linux go build -mod=vendor -o courier ./cmd/courier
 
 # Stage 2: Minimal image
 FROM alpine:latest

@@ -6,12 +6,12 @@ WORKDIR /app
 RUN apk add --no-cache gcc musl-dev
 
 COPY go.mod go.sum ./
-RUN go mod download
+COPY vendor/ vendor/
 
 COPY . .
 
 # Build aplikasi hub dengan CGO_ENABLED=1
-RUN CGO_ENABLED=1 GOOS=linux go build -o hub ./cmd/hub
+RUN CGO_ENABLED=1 GOOS=linux go build -mod=vendor -o hub ./cmd/hub
 
 # Stage 2: Minimal image
 FROM alpine:latest
