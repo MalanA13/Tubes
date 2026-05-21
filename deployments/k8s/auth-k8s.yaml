@@ -1,0 +1,33 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: auth-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: auth
+  template:
+    metadata:
+      labels:
+        app: auth
+    spec:
+      containers:
+      - name: auth-container
+        image: muhiban/auth-service:v1 # Image yang kamu push tadi
+        ports:
+        - containerPort: 8080
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: auth-service
+spec:
+  type: LoadBalancer # Agar bisa diakses lewat IP mesin/Node
+  selector:
+    app: auth
+  ports:
+    - protocol: TCP
+      port: 8086      # Port internal cluster
+      targetPort: 8080
+      # nodePort: 30086 # Kita gunakan angka 86 agar konsisten dengan port 8086 mu

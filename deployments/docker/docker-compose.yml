@@ -43,6 +43,20 @@ services:
       - "5678:8080"
     networks:
       - logistics-net
+  
+  auth-service:
+    build:
+      context: ../../
+      dockerfile: deployments/docker/auth.Dockerfile
+    ports:
+      - "8086:8080"
+
+  notification-service:
+    build:
+      context: ../../
+      dockerfile: deployments/docker/notification.Dockerfile
+    ports:
+      - "8087:8080"
 
 networks:
   logistics-net:
