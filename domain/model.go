@@ -18,6 +18,31 @@ const (
 	StatusReturned    TrackingStatus = "RETURNED"     // Paket dikembalikan
 )
 
+// ServiceType merepresentasikan jenis layanan pengiriman.
+type ServiceType string
+
+const (
+	ServiceRegular ServiceType = "REGULAR"
+	ServiceExpress ServiceType = "EXPRESS"
+	ServiceSameday ServiceType = "SAMEDAY"
+	ServiceNextday ServiceType = "NEXTDAY"
+)
+
+// PricingRequest merepresentasikan input untuk perhitungan harga.
+type PricingRequest struct {
+	Origin      string      `json:"origin"`
+	Destination string      `json:"destination"`
+	Weight      float64     `json:"weight"` // in Kg
+	Distance    float64     `json:"distance"` // in Km
+	ServiceType ServiceType `json:"service_type"`
+}
+
+// PricingResult merepresentasikan hasil perhitungan harga.
+type PricingResult struct {
+	TotalCost float64 `json:"total_cost"`
+	BaseCost  float64 `json:"base_cost"`
+}
+
 // Shipment merepresentasikan data pengiriman / resi.
 type Shipment struct {
 	ResiID    string         `json:"resi_id"`

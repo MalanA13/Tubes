@@ -28,6 +28,6 @@ spec:
     app: auth
   ports:
     - protocol: TCP
-      port: 8086      # Port internal cluster
+      port: 8087      # Port internal cluster
       targetPort: 8080
-      # nodePort: 30086 # Kita gunakan angka 86 agar konsisten dengan port 8086 mu
+      # nodePort: 30087 # Gunakan angka 87 agar konsisten dengan port 8087 service ini

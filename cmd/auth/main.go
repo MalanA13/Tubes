@@ -3,7 +3,7 @@ package main
 import (
 	"log"
 	"net/http"
-	
+
 	"github.com/gorilla/mux" // Pastikan library router sesuai yang kelompokmu pakai
 	// 1. Import Handler dan Logika Auth dari folder internal kelompok
 	"github.com/tubes-cc/logistics/internal/auth"
@@ -11,10 +11,11 @@ import (
 
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
-
 )
 
 func main() {
+	log.Println("Starting Auth-User Service...")
+
 	db, err := gorm.Open(sqlite.Open("auth.db"), &gorm.Config{})
 	if err != nil {
 		log.Fatalf("Failed to connect to auth database: %v", err)
@@ -24,7 +25,7 @@ func main() {
 
 	// 2. Inisialisasi Repository dan Service Auth (dari internal/auth)
 	// Sesuaikan dengan nama database/mock yang kamu pakai kemarin
-	authRepo := auth.NewUserRepository(db) 
+	authRepo := auth.NewUserRepository(db)
 	authService := auth.NewAuthService(authRepo)
 
 	// 3. Daftarkan Route menggunakan Handler yang sudah dipindah ke internal/handler

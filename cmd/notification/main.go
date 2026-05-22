@@ -6,15 +6,16 @@ import (
 
 	"github.com/gorilla/mux"
 	// Import Handler dan Logika Notification dari folder internal kelompok
-	"github.com/tubes-cc/logistics/internal/notification"
 	"github.com/tubes-cc/logistics/internal/handler"
+	"github.com/tubes-cc/logistics/internal/notification"
 
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
-
 )
 
 func main() {
+	log.Println("Starting Notification Service...")
+
 	db, err := gorm.Open(sqlite.Open("notification.db"), &gorm.Config{})
 	if err != nil {
 		log.Fatalf("Failed to connect to notification database: %v", err)

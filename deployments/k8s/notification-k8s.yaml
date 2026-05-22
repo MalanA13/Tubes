@@ -28,6 +28,6 @@ spec:
     app: notification
   ports:
     - protocol: TCP
-      port: 8087
+      port: 8086
       targetPort: 8080
-      # nodePort: 30087 # Kita gunakan angka 87 agar konsisten dengan port 8087 mu
+      # nodePort: 30086 # Gunakan angka 86 agar konsisten dengan port 8086
