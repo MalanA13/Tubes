@@ -23,6 +23,13 @@ type TrackingClient interface {
 	AddTrackingEvent(ctx context.Context, event *domain.TrackingEvent) error
 }
 
+// PricingClient mendefinisikan kontrak untuk meminta perhitungan harga
+// ke Pricing Service.
+type PricingClient interface {
+	// CalculatePrice meminta Pricing Service menghitung ongkos kirim.
+	CalculatePrice(ctx context.Context, req domain.PricingRequest) (*domain.PricingResult, error)
+}
+
 // OrderClient mendefinisikan kontrak untuk validasi resi
 // ke Order Service.
 //

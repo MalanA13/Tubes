@@ -3,6 +3,7 @@ package main
 import (
 	"log"
 	"net/http"
+	"os"
 
 	"github.com/gorilla/mux"
 	// Import Handler dan Logika Pricing dari folder internal kelompok
@@ -31,6 +32,16 @@ func main() {
 	// Daftarkan Route ke handler kelompok
 	r.HandleFunc("/pricing", handler.HandleSendPricingHTTP(*pricingService)).Methods("POST")
 
-	log.Println("Pricing Service running on port 8082...")
-	log.Fatal(http.ListenAndServe(":8082", r))
+	port := ":" + getEnv("PORT", "8082") // Pricing service uses port 8082
+	log.Printf("Pricing Service is running on port %s", port)
+	if err := http.ListenAndServe(port, r); err != nil {
+		log.Fatalf("Failed to start server: %v", err)
+	}
+}
+
+func getEnv(key, fallback string) string {
+	if value, exists := os.LookupEnv(key); exists {
+		return value
+	}
+	return fallback
 }

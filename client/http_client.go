@@ -61,6 +61,55 @@ func (c *HTTPTrackingClient) AddTrackingEvent(ctx context.Context, event *domain
 }
 
 // ================================================================
+// HTTPPricingClient — implementasi PricingClient via HTTP
+// ================================================================
+
+// HTTPPricingClient mengirim request perhitungan harga via HTTP POST ke Pricing Service.
+type HTTPPricingClient struct {
+	baseURL    string
+	httpClient *http.Client
+}
+
+// NewHTTPPricingClient membuat PricingClient baru.
+func NewHTTPPricingClient(baseURL string) *HTTPPricingClient {
+	return &HTTPPricingClient{
+		baseURL:    baseURL,
+		httpClient: &http.Client{Timeout: 5 * time.Second},
+	}
+}
+
+// CalculatePrice mengirim request POST ke Pricing Service dan mengembalikan hasilnya.
+func (c *HTTPPricingClient) CalculatePrice(ctx context.Context, req domain.PricingRequest) (*domain.PricingResult, error) {
+	body, err := json.Marshal(req)
+	if err != nil {
+		return nil, fmt.Errorf("pricing client: marshal request: %w", err)
+	}
+
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL+"/pricing", bytes.NewReader(body))
+	if err != nil {
+		return nil, fmt.Errorf("pricing client: buat request: %w", err)
+	}
+	httpReq.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.httpClient.Do(httpReq)
+	if err != nil {
+		return nil, fmt.Errorf("pricing client: kirim request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("pricing client: status tidak OK: %d", resp.StatusCode)
+	}
+
+	var result domain.PricingResult
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, fmt.Errorf("pricing client: decode response: %w", err)
+	}
+
+	return &result, nil
+}
+
+// ================================================================
 // HTTPOrderClient — implementasi OrderClient via HTTP
 // ================================================================
 

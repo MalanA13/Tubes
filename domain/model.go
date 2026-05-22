@@ -43,6 +43,27 @@ type PricingResult struct {
 	BaseCost  float64 `json:"base_cost"`
 }
 
+// OrderRequest merepresentasikan input untuk pembuatan order baru.
+type OrderRequest struct {
+	SenderName    string      `json:"sender_name"`
+	RecipientName string      `json:"recipient_name"`
+	Origin        string      `json:"origin"`
+	Destination   string      `json:"destination"`
+	Weight        float64     `json:"weight"`
+	Dimensions    string      `json:"dimensions"`
+	ItemType      string      `json:"item_type"`
+	ServiceType   ServiceType `json:"service_type"`
+	Distance      float64     `json:"distance"`
+}
+
+// OrderResponse merepresentasikan respons sukses pembuatan order.
+type OrderResponse struct {
+	OrderID   string         `json:"order_id"`
+	ResiID    string         `json:"resi_id"`
+	Status    TrackingStatus `json:"status"`
+	TotalCost float64        `json:"total_cost"`
+}
+
 // Shipment merepresentasikan data pengiriman / resi.
 type Shipment struct {
 	ResiID    string         `json:"resi_id"`
