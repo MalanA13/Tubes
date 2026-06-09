@@ -3,7 +3,11 @@
 // Tidak bergantung pada package lain — innermost layer dalam clean architecture.
 package domain
 
-import "time"
+import (
+	"time"
+
+	"github.com/golang-jwt/jwt/v5"
+)
 
 // TrackingStatus merepresentasikan status pengiriman paket.
 type TrackingStatus string
@@ -96,4 +100,5 @@ const (
 type AuthClaims struct {
 	UserID string   `json:"user_id"`
 	Role   UserRole `json:"role"`
+	jwt.RegisteredClaims
 }

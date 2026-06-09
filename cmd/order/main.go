@@ -71,8 +71,8 @@ func main() {
 	port := ":" + getEnv("PORT", "8081") // Order service uses port 8081
 	log.Printf("Order Service is running on port %s", port)
 	if err := http.ListenAndServe(port, router); err != nil {
-	log.Fatalf("Failed to start server: %v", err)
-}
+		log.Fatalf("Failed to start server: %v", err)
+	}
 }
 
 func getEnv(key, fallback string) string {

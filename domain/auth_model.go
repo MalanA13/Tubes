@@ -23,3 +23,19 @@ type LoginRequest struct {
 type LoginResponse struct {
     Token string `json:"token"`
 }
+
+// Struct untuk request register akun baru
+type RegisterRequest struct {
+    FullName string `json:"full_name" binding:"required"`
+    Email    string `json:"email" binding:"required"`
+    Password string `json:"password" binding:"required"`
+}
+
+// Struct untuk response setelah register berhasil
+type RegisterResponse struct {
+    ID        uint      `json:"id"`
+    Email     string    `json:"email"`
+    FullName  string    `json:"full_name"`
+    Role      string    `json:"role"`
+    CreatedAt time.Time `json:"created_at"`
+}

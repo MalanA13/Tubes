@@ -31,7 +31,7 @@ func main() {
 	// 3. Daftarkan Route menggunakan Handler yang sudah dipindah ke internal/handler
 	// Pastikan fungsi di auth_handler.go kamu menggunakan package 'handler'
 	r.HandleFunc("/login", handler.HandleLogin(*authService)).Methods("POST")
-	r.HandleFunc("/register", handler.HandleLogin(*authService)).Methods("POST")
+	r.HandleFunc("/register", handler.HandleRegister(*authService)).Methods("POST")
 	r.HandleFunc("/auth/validate", handler.HandleValidateToken(*authService)).Methods("POST")
 
 	log.Println("Auth Service running on port 8080...")
