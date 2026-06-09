@@ -23,6 +23,11 @@ func main() {
 		log.Fatalf("Failed to connect to tracking database: %v", err)
 	}
 
+	// Auto-migrate Tracking models
+	if err := db.AutoMigrate(&tracking.TrackingEventModel{}, &tracking.ShipmentModel{}); err != nil {
+		log.Fatalf("Failed to auto-migrate tracking tables: %v", err)
+	}
+
 	r := mux.NewRouter()
 
 	// Inisialisasi Service Tracking (dari internal/tracking)

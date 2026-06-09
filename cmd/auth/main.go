@@ -5,7 +5,7 @@ import (
 	"net/http"
 
 	"github.com/gorilla/mux" // Pastikan library router sesuai yang kelompokmu pakai
-	// 1. Import Handler dan Logika Auth dari folder internal kelompok
+	models "github.com/tubes-cc/logistics/domain"
 	"github.com/tubes-cc/logistics/internal/auth"
 	"github.com/tubes-cc/logistics/internal/handler"
 
@@ -19,6 +19,11 @@ func main() {
 	db, err := gorm.Open(sqlite.Open("auth.db"), &gorm.Config{})
 	if err != nil {
 		log.Fatalf("Failed to connect to auth database: %v", err)
+	}
+
+	// Auto-migrate User model
+	if err := db.AutoMigrate(&models.User{}); err != nil {
+		log.Fatalf("Failed to auto-migrate User table: %v", err)
 	}
 
 	r := mux.NewRouter()
