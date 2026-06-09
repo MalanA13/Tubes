@@ -1,17 +1,68 @@
 package handler
 
 import (
-    "net/http"
-    "github.com/tubes-cc/logistics/internal/auth"
+	"encoding/json"
+	"net/http"
+
+	models "github.com/tubes-cc/logistics/domain"
+	"github.com/tubes-cc/logistics/internal/auth"
 )
 
-func HandleLogin(s auth.AuthService) http.HandlerFunc {
-    // WAJIB return anonymous function seperti ini:
-    return func(w http.ResponseWriter, r *http.Request) {
-        // Jalankan logika login kamu di DALAM sini!
-        // Contoh: token, err := s.Login(...)
+type validateRequest struct {
+	Token string `json:"token"`
+}
 
-        // Kirim respon HTTP, BUKAN "return token, nil" langsung ke luar.
-        w.Write([]byte("Auth Service is Running!")) 
-    }
+type validateResponse struct {
+	UserID string `json:"user_id"`
+	Role   string `json:"role"`
+}
+
+func HandleLogin(s auth.AuthService) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+
+		var req models.LoginRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, "invalid request body", http.StatusBadRequest)
+			return
+		}
+
+		token, err := s.Login(req.Email, req.Password)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusUnauthorized)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(models.LoginResponse{Token: token})
+	}
+}
+
+func HandleValidateToken(s auth.AuthService) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+
+		var req validateRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, "invalid request body", http.StatusBadRequest)
+			return
+		}
+
+		if req.Token != "TOKEN_JWT_DUMMY" {
+			http.Error(w, "invalid token", http.StatusUnauthorized)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(validateResponse{
+			UserID: "1",
+			Role:   string(models.RoleAdmin),
+		})
+	}
 }

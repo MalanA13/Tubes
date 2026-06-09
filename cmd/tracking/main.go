@@ -31,6 +31,7 @@ func main() {
 
 	// Daftarkan Route ke handler kelompok
 	r.HandleFunc("/track", handler.HandleSendTrackingHTTP(*trackingService)).Methods("POST")
+	r.HandleFunc("/events", handler.HandleSendTrackingHTTP(*trackingService)).Methods("POST")
 
 	port := ":" + getEnv("PORT", "8083") // Tracking service uses port 8083
 	log.Printf("Tracking Service is running on port %s", port)

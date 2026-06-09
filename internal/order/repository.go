@@ -26,6 +26,7 @@ type OrderModel struct {
 // OrderRepository defines the interface for order DB operations.
 type OrderRepository interface {
 	SaveOrder(order *OrderModel) error
+	ValidateResi(resiID string) (bool, error)
 }
 
 type orderRepository struct {
@@ -44,4 +45,14 @@ func NewOrderRepository(db *gorm.DB) (OrderRepository, error) {
 // SaveOrder saves an order into the database.
 func (r *orderRepository) SaveOrder(order *OrderModel) error {
 	return r.db.Create(order).Error
+}
+
+// ValidateResi checks if the resi ID exists in the database.
+func (r *orderRepository) ValidateResi(resiID string) (bool, error) {
+	var count int64
+	err := r.db.Model(&OrderModel{}).Where("resi_id = ?", resiID).Count(&count).Error
+	if err != nil {
+		return false, err
+	}
+	return count > 0, nil
 }

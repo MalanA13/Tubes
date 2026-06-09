@@ -16,6 +16,7 @@ type MockOrderRepository struct {
 type MockOrderRepositoryMockRecorder struct {
 	mock *MockOrderRepository
 }
+
 func NewMockOrderRepository(ctrl *gomock.Controller) *MockOrderRepository {
 	mock := &MockOrderRepository{ctrl: ctrl}
 	mock.recorder = &MockOrderRepositoryMockRecorder{mock}
@@ -35,6 +36,18 @@ func (mr *MockOrderRepositoryMockRecorder) SaveOrder(order interface{}) *gomock.
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SaveOrder", reflect.TypeOf((*MockOrderRepository)(nil).SaveOrder), order)
 }
 
+func (m *MockOrderRepository) ValidateResi(resiID string) (bool, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ValidateResi", resiID)
+	ret0, _ := ret[0].(bool)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+func (mr *MockOrderRepositoryMockRecorder) ValidateResi(resiID interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ValidateResi", reflect.TypeOf((*MockOrderRepository)(nil).ValidateResi), resiID)
+}
+
 // MockPricingClient is a mock of client.PricingClient interface.
 type MockPricingClient struct {
 	ctrl     *gomock.Controller
@@ -43,6 +56,7 @@ type MockPricingClient struct {
 type MockPricingClientMockRecorder struct {
 	mock *MockPricingClient
 }
+
 func NewMockPricingClient(ctrl *gomock.Controller) *MockPricingClient {
 	mock := &MockPricingClient{ctrl: ctrl}
 	mock.recorder = &MockPricingClientMockRecorder{mock}
@@ -71,6 +85,7 @@ type MockTrackingClient struct {
 type MockTrackingClientMockRecorder struct {
 	mock *MockTrackingClient
 }
+
 func NewMockTrackingClient(ctrl *gomock.Controller) *MockTrackingClient {
 	mock := &MockTrackingClient{ctrl: ctrl}
 	mock.recorder = &MockTrackingClientMockRecorder{mock}

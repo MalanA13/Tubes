@@ -32,6 +32,7 @@ func main() {
 	// Pastikan fungsi di auth_handler.go kamu menggunakan package 'handler'
 	r.HandleFunc("/login", handler.HandleLogin(*authService)).Methods("POST")
 	r.HandleFunc("/register", handler.HandleLogin(*authService)).Methods("POST")
+	r.HandleFunc("/auth/validate", handler.HandleValidateToken(*authService)).Methods("POST")
 
 	log.Println("Auth Service running on port 8080...")
 	log.Fatal(http.ListenAndServe(":8080", r)) // Port internal container tetap 8080

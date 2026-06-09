@@ -41,17 +41,38 @@ func main() {
 	orderService := order.NewService(orderRepo, trackingClient, pricingClient)
 
 	// 4. Setup Routes
-	mux := mux.NewRouter()
+	router := mux.NewRouter()
 
-	// 5. Register the endpoint
-	mux.HandleFunc("/order", handler.HandleOrderHTTP(*orderService)).Methods("POST")
+	// 5. Register the endpoints
+	router.HandleFunc("/order", handler.HandleOrderHTTP(*orderService)).Methods("POST")
+	router.HandleFunc("/orders/{resiID}/validate", func(w http.ResponseWriter, r *http.Request) {
+		vars := mux.Vars(r)
+		resiID := vars["resiID"]
+		if resiID == "" {
+			http.Error(w, "resiID is required", http.StatusBadRequest)
+			return
+		}
+
+		exists, err := orderRepo.ValidateResi(resiID)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		if !exists {
+			http.NotFound(w, r)
+			return
+		}
+
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"status":"valid"}`))
+	}).Methods("GET")
 
 	// 6. Start Server
 	port := ":" + getEnv("PORT", "8081") // Order service uses port 8081
 	log.Printf("Order Service is running on port %s", port)
-	if err := http.ListenAndServe(port, mux); err != nil {
-		log.Fatalf("Failed to start server: %v", err)
-	}
+	if err := http.ListenAndServe(port, router); err != nil {
+	log.Fatalf("Failed to start server: %v", err)
+}
 }
 
 func getEnv(key, fallback string) string {
