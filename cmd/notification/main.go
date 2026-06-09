@@ -5,7 +5,7 @@ import (
 	"net/http"
 
 	"github.com/gorilla/mux"
-	// Import Handler dan Logika Notification dari folder internal kelompok
+	models "github.com/tubes-cc/logistics/domain"
 	"github.com/tubes-cc/logistics/internal/handler"
 	"github.com/tubes-cc/logistics/internal/notification"
 
@@ -21,13 +21,18 @@ func main() {
 		log.Fatalf("Failed to connect to notification database: %v", err)
 	}
 
-	r := mux.NewRouter()
+	// Auto-migrate: creates the notifications table if it doesn't exist
+	if err := db.AutoMigrate(&models.Notification{}); err != nil {
+		log.Fatalf("Failed to auto-migrate notification table: %v", err)
+	}
 
-	// Inisialisasi Service Notification (dari internal/notification)
+	// Initialize Repository and Service
 	notifRepo := notification.NewNotificationRepository(db)
 	notifService := notification.NewNotificationService(notifRepo)
 
-	// Daftarkan Route ke handler kelompok
+	r := mux.NewRouter()
+
+	// Register the POST /notify route with the real handler
 	r.HandleFunc("/notify", handler.HandleSendNotificationHTTP(*notifService)).Methods("POST")
 
 	log.Println("Notification Service running on port 8080...")

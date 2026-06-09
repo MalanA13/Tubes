@@ -1,8 +1,10 @@
 package notification
 
-import "errors"
+import "fmt"
 
-// LoginUser adalah fungsi stub
-func smsUser(email, password string) (string, error) {
-    return "", errors.New("LOGIC_NOT_IMPLEMENTED")
+// SendSMS simulates sending an SMS notification.
+// In production, this would integrate with Twilio, Vonage, etc.
+func SendSMS(to, message string) error {
+	fmt.Printf(">>> SMS TO %s | Message: %s\n", to, message)
+	return nil
 }
