@@ -1,21 +1,26 @@
-# Gunakan 1.25 sesuai permintaan go.mod kamu
 FROM golang:1.25-alpine AS builder
 
 WORKDIR /app
 
-# Karena context adalah root, Docker sekarang bisa lihat go.mod & go.sum
+RUN apk add --no-cache gcc musl-dev
+
 COPY go.mod go.sum ./
+COPY vendor/ vendor/
+
 RUN go mod download
 
-# Copy seluruh isi folder tubes-unit_test ke dalam container
 COPY . .
 
-# Build aplikasi. Karena main.go ada di dalam auth-service, kita arahkan path-nya
-RUN go build -o main ./notification-service/main.go
+RUN CGO_ENABLED=1 GOOS=linux go build -mod=vendor -o main ./cmd/notification
 
-# Stage 2: Final Image
 FROM alpine:latest
+
 WORKDIR /root/
+
+RUN apk --no-cache add ca-certificates tzdata
+
 COPY --from=builder /app/main .
-EXPOSE 8080
+
+EXPOSE 8086
+
 CMD ["./main"]
