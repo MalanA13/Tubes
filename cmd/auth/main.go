@@ -1,13 +1,21 @@
 package main
 
 import (
+	"context"
+	"errors"
 	"log"
 	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
 	"github.com/gorilla/mux" // Pastikan library router sesuai yang kelompokmu pakai
 	models "github.com/tubes-cc/logistics/domain"
 	"github.com/tubes-cc/logistics/internal/auth"
+	"github.com/tubes-cc/logistics/internal/config"
 	"github.com/tubes-cc/logistics/internal/handler"
+	"github.com/tubes-cc/logistics/internal/middleware"
 
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
@@ -16,7 +24,9 @@ import (
 func main() {
 	log.Println("Starting Auth-User Service...")
 
-	db, err := gorm.Open(sqlite.Open("auth.db"), &gorm.Config{})
+	cfg := config.LoadAuthConfig()
+
+	db, err := gorm.Open(sqlite.Open(cfg.DBPath), &gorm.Config{})
 	if err != nil {
 		log.Fatalf("Failed to connect to auth database: %v", err)
 	}
@@ -39,6 +49,43 @@ func main() {
 	r.HandleFunc("/register", handler.HandleRegister(*authService)).Methods("POST")
 	r.HandleFunc("/auth/validate", handler.HandleValidateToken(*authService)).Methods("POST")
 
-	log.Println("Auth Service running on port 8080...")
-	log.Fatal(http.ListenAndServe(":8080", r)) // Port internal container tetap 8080
+	// Health check endpoint
+	r.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"status":"UP","service":"auth"}`))
+	}).Methods("GET")
+
+	port := ":" + cfg.Port
+
+	srv := &http.Server{
+		Addr:         port,
+		Handler:      middleware.CORS(r),
+		ReadTimeout:  10 * time.Second,
+		WriteTimeout: 10 * time.Second,
+		IdleTimeout:  60 * time.Second,
+	}
+
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	go func() {
+		log.Printf("Auth Service is running on port %s", port)
+		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			log.Printf("Failed to start server: %v", err)
+		}
+	}()
+
+	<-ctx.Done()
+	stop()
+	log.Println("Shutting down gracefully, press Ctrl+C again to force")
+
+	timeoutCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	if err := srv.Shutdown(timeoutCtx); err != nil {
+		log.Printf("Server forced to shutdown: %v", err)
+	}
+
+	log.Println("Server exiting")
 }

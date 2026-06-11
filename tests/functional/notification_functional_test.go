@@ -101,10 +101,14 @@ func TestNotifyHTTP_Success_Functional(t *testing.T) {
 
 	assert.Equal(t, http.StatusCreated, rec.Code, "Should return 201 Created")
 
-	var resp map[string]string
+	var resp struct {
+		Success bool              `json:"success"`
+		Data    map[string]string `json:"data"`
+	}
 	err := json.NewDecoder(rec.Body).Decode(&resp)
 	assert.NoError(t, err)
-	assert.Equal(t, "sent", resp["status"])
+	assert.True(t, resp.Success)
+	assert.Equal(t, "sent", resp.Data["status"])
 
 	// Verify persistence
 	var savedNotif domain.Notification

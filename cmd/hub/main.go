@@ -1,22 +1,31 @@
 package main
 
 import (
+	"context"
+	"errors"
 	"log"
 	"net/http"
 	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
 	"github.com/tubes-cc/logistics/client"
 	sqliterepo "github.com/tubes-cc/logistics/infrastructure/sqlite"
+	"github.com/tubes-cc/logistics/internal/config"
 	"github.com/tubes-cc/logistics/internal/handler"
 	"github.com/tubes-cc/logistics/internal/hub"
 	"github.com/tubes-cc/logistics/internal/middleware"
+	"github.com/tubes-cc/logistics/internal/response"
 )
 
 func main() {
 	log.Println("Starting Hub Service...")
 
+	cfg := config.LoadHubConfig()
+
 	// 1. Setup Database
-	db, err := sqliterepo.Open("hub.db")
+	db, err := sqliterepo.Open(cfg.DBPath)
 	if err != nil {
 		log.Fatalf("Failed to open database: %v", err)
 	}
@@ -28,13 +37,9 @@ func main() {
 	}
 
 	// 2. Setup Clients (Inter-service communication)
-	trackingURL := getEnv("TRACKING_SVC_URL", "http://tracking-service:8080")
-	orderURL := getEnv("ORDER_SVC_URL", "http://order-service:8080")
-	authURL := getEnv("AUTH_SVC_URL", "http://auth-service:8080")
-
-	trackingClient := client.NewHTTPTrackingClient(trackingURL)
-	orderClient := client.NewHTTPOrderClient(orderURL)
-	authClient := client.NewHTTPAuthClient(authURL)
+	trackingClient := client.NewHTTPTrackingClient(cfg.TrackingSvcURL)
+	orderClient := client.NewHTTPOrderClient(cfg.OrderSvcURL)
+	authClient := client.NewHTTPAuthClient(cfg.AuthSvcURL)
 
 	// 3. Setup Service
 	hubService := hub.NewService(repo, trackingClient, orderClient)
@@ -55,17 +60,48 @@ func main() {
 		authMiddleware.RequireRole("admin", hubHandler.ScanOut),
 	))
 
-	// 6. Start Server
-	port := ":" + getEnv("PORT", "8084") // Hub service uses port 8084
-	log.Printf("Hub Service is running on port %s", port)
-	if err := http.ListenAndServe(port, mux); err != nil {
-		log.Fatalf("Failed to start server: %v", err)
-	}
-}
+	// Health check endpoint (no auth required)
+	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			response.MethodNotAllowed(w, "Method not allowed")
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"status":"UP","service":"hub"}`))
+	})
 
-func getEnv(key, fallback string) string {
-	if value, exists := os.LookupEnv(key); exists {
-		return value
+	// 6. Start Server
+	port := ":" + cfg.Port // Hub service uses port 8084
+
+	srv := &http.Server{
+		Addr:         port,
+		Handler:      middleware.CORS(mux),
+		ReadTimeout:  10 * time.Second,
+		WriteTimeout: 10 * time.Second,
+		IdleTimeout:  60 * time.Second,
 	}
-	return fallback
+
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	go func() {
+		log.Printf("Hub Service is running on port %s", port)
+		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			log.Printf("Failed to start server: %v", err)
+		}
+	}()
+
+	<-ctx.Done()
+	stop()
+	log.Println("Shutting down gracefully, press Ctrl+C again to force")
+
+	timeoutCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	if err := srv.Shutdown(timeoutCtx); err != nil {
+		log.Printf("Server forced to shutdown: %v", err)
+	}
+
+	log.Println("Server exiting")
 }

@@ -7,6 +7,7 @@ import (
 	"net/http"
 
 	"github.com/tubes-cc/logistics/internal/hub"
+	"github.com/tubes-cc/logistics/internal/response"
 )
 
 // HubHandler menangani semua HTTP request untuk Hub Service.
@@ -36,22 +37,22 @@ type scanRequest struct {
 //	{"status": "ok", "message": "Scan-in berhasil"}
 func (h *HubHandler) ScanIn(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		writeError(w, http.StatusMethodNotAllowed, "gunakan POST")
+		response.MethodNotAllowed(w, "gunakan POST")
 		return
 	}
 
 	var req scanRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeError(w, http.StatusBadRequest, "body request tidak valid JSON")
+		response.BadRequest(w, "body request tidak valid JSON")
 		return
 	}
 
 	if err := h.service.ScanIn(r.Context(), req.ResiID, req.HubID); err != nil {
-		writeError(w, http.StatusBadRequest, err.Error())
+		response.BadRequest(w, err.Error())
 		return
 	}
 
-	writeSuccess(w, "Scan-in berhasil dicatat")
+	response.OK(w, map[string]string{"message": "Scan-in berhasil dicatat"})
 }
 
 // ScanOut menangani POST /hub/scan-out
@@ -61,44 +62,20 @@ func (h *HubHandler) ScanIn(w http.ResponseWriter, r *http.Request) {
 //	{"resi_id": "JNE-001", "hub_id": "HUB-JKT-01"}
 func (h *HubHandler) ScanOut(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		writeError(w, http.StatusMethodNotAllowed, "gunakan POST")
+		response.MethodNotAllowed(w, "gunakan POST")
 		return
 	}
 
 	var req scanRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeError(w, http.StatusBadRequest, "body request tidak valid JSON")
+		response.BadRequest(w, "body request tidak valid JSON")
 		return
 	}
 
 	if err := h.service.ScanOut(r.Context(), req.ResiID, req.HubID); err != nil {
-		writeError(w, http.StatusBadRequest, err.Error())
+		response.BadRequest(w, err.Error())
 		return
 	}
 
-	writeSuccess(w, "Scan-out berhasil dicatat")
-}
-
-// ---- shared response helpers ----
-
-type successResponse struct {
-	Status  string `json:"status"`
-	Message string `json:"message"`
-}
-
-type errorResponse struct {
-	Error   string `json:"error"`
-	Message string `json:"message"`
-}
-
-func writeSuccess(w http.ResponseWriter, msg string) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(successResponse{Status: "ok", Message: msg})
-}
-
-func writeError(w http.ResponseWriter, code int, msg string) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(code)
-	json.NewEncoder(w).Encode(errorResponse{Error: http.StatusText(code), Message: msg})
+	response.OK(w, map[string]string{"message": "Scan-out berhasil dicatat"})
 }

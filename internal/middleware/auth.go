@@ -6,12 +6,12 @@ package middleware
 
 import (
 	"context"
-	"encoding/json"
 	"net/http"
 	"strings"
 
 	"github.com/tubes-cc/logistics/client"
 	"github.com/tubes-cc/logistics/domain"
+	"github.com/tubes-cc/logistics/internal/response"
 )
 
 // contextKey adalah tipe untuk key dalam context agar menghindari collision.
@@ -50,14 +50,14 @@ func (m *AuthMiddleware) Authenticate(next http.HandlerFunc) http.HandlerFunc {
 		// Ambil token dari header Authorization
 		authHeader := r.Header.Get("Authorization")
 		if authHeader == "" {
-			writeJSONError(w, http.StatusUnauthorized, "missing Authorization header")
+			response.Unauthorized(w, "missing Authorization header")
 			return
 		}
 
 		// Format harus "Bearer <token>"
 		parts := strings.SplitN(authHeader, " ", 2)
 		if len(parts) != 2 || !strings.EqualFold(parts[0], "Bearer") {
-			writeJSONError(w, http.StatusUnauthorized, "invalid Authorization header format, use: Bearer <token>")
+			response.Unauthorized(w, "invalid Authorization header format, use: Bearer <token>")
 			return
 		}
 
@@ -66,7 +66,7 @@ func (m *AuthMiddleware) Authenticate(next http.HandlerFunc) http.HandlerFunc {
 		// Validasi token via AuthClient
 		claims, err := m.authClient.ValidateToken(r.Context(), token)
 		if err != nil {
-			writeJSONError(w, http.StatusUnauthorized, "token tidak valid: "+err.Error())
+			response.Unauthorized(w, "token tidak valid: "+err.Error())
 			return
 		}
 
@@ -86,13 +86,12 @@ func (m *AuthMiddleware) RequireRole(role domain.UserRole, next http.HandlerFunc
 	return func(w http.ResponseWriter, r *http.Request) {
 		claims, ok := r.Context().Value(ContextKeyAuthClaims).(*domain.AuthClaims)
 		if !ok || claims == nil {
-			writeJSONError(w, http.StatusUnauthorized, "claims tidak ditemukan di context")
+			response.Unauthorized(w, "claims tidak ditemukan di context")
 			return
 		}
 
 		if claims.Role != role {
-			writeJSONError(w, http.StatusForbidden,
-				"akses ditolak: membutuhkan role "+string(role)+", user memiliki role "+string(claims.Role))
+			response.Forbidden(w, "akses ditolak: membutuhkan role "+string(role)+", user memiliki role "+string(claims.Role))
 			return
 		}
 
@@ -105,20 +104,4 @@ func (m *AuthMiddleware) RequireRole(role domain.UserRole, next http.HandlerFunc
 func GetAuthClaims(r *http.Request) *domain.AuthClaims {
 	claims, _ := r.Context().Value(ContextKeyAuthClaims).(*domain.AuthClaims)
 	return claims
-}
-
-// middlewareErrorResponse adalah format response error dari middleware.
-type middlewareErrorResponse struct {
-	Error   string `json:"error"`
-	Message string `json:"message"`
-}
-
-// writeJSONError menulis response error dalam format JSON.
-func writeJSONError(w http.ResponseWriter, statusCode int, message string) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(statusCode)
-	json.NewEncoder(w).Encode(middlewareErrorResponse{
-		Error:   http.StatusText(statusCode),
-		Message: message,
-	})
 }

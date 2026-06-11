@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/tubes-cc/logistics/internal/notification"
+	"github.com/tubes-cc/logistics/internal/response"
 )
 
 // notifyRequest represents the JSON body for POST /notify.
@@ -28,49 +29,29 @@ type notifyResponse struct {
 func HandleSendNotificationHTTP(s notification.NotificationService) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
-			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			response.MethodNotAllowed(w, "method not allowed")
 			return
 		}
 
 		var req notifyRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusBadRequest)
-			json.NewEncoder(w).Encode(notifyResponse{
-				Status:    "error",
-				Message:   "invalid request body",
-				Timestamp: time.Now().Format(time.RFC3339),
-			})
+			response.BadRequest(w, "invalid request body")
 			return
 		}
 
 		// Validate required fields
 		if req.UserID == "" || req.Message == "" || req.Type == "" {
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusBadRequest)
-			json.NewEncoder(w).Encode(notifyResponse{
-				Status:    "error",
-				Message:   "user_id, message, and type are required",
-				Timestamp: time.Now().Format(time.RFC3339),
-			})
+			response.BadRequest(w, "user_id, message, and type are required")
 			return
 		}
 
 		// Call the real service — sends notification and persists the log
 		if err := s.CreateNotification(req.UserID, req.Message, req.Type); err != nil {
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusInternalServerError)
-			json.NewEncoder(w).Encode(notifyResponse{
-				Status:    "error",
-				Message:   err.Error(),
-				Timestamp: time.Now().Format(time.RFC3339),
-			})
+			response.InternalServerError(w, err.Error())
 			return
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusCreated)
-		json.NewEncoder(w).Encode(notifyResponse{
+		response.Created(w, notifyResponse{
 			Status:    "sent",
 			Message:   "notification sent successfully",
 			Timestamp: time.Now().Format(time.RFC3339),

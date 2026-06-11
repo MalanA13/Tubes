@@ -1,16 +1,24 @@
 package main
 
 import (
+	"context"
+	"errors"
 	"log"
 	"net/http"
 	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
 	"github.com/gorilla/mux"
 	// Import Handler dan Logika Pricing dari folder internal kelompok
 
 	"github.com/tubes-cc/logistics/client"
+	"github.com/tubes-cc/logistics/internal/config"
 	"github.com/tubes-cc/logistics/internal/handler"
+	"github.com/tubes-cc/logistics/internal/middleware"
 	"github.com/tubes-cc/logistics/internal/order"
+	"github.com/tubes-cc/logistics/internal/response"
 
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
@@ -19,8 +27,10 @@ import (
 func main() {
 	log.Println("Starting Ordering Service...")
 
+	cfg := config.LoadOrderConfig()
+
 	// 1. Setup Database & Repository
-	db, err := gorm.Open(sqlite.Open("order.db"), &gorm.Config{})
+	db, err := gorm.Open(sqlite.Open(cfg.DBPath), &gorm.Config{})
 	if err != nil {
 		log.Fatalf("Failed to open database: %v", err)
 	}
@@ -31,11 +41,8 @@ func main() {
 	}
 
 	// 2. Setup Clients (Inter-service communication)
-	trackingURL := getEnv("TRACKING_SVC_URL", "http://tracking-service:8080")
-	pricingURL := getEnv("PRICING_SVC_URL", "http://pricing-service:8080")
-
-	trackingClient := client.NewHTTPTrackingClient(trackingURL)
-	pricingClient := client.NewHTTPPricingClient(pricingURL)
+	trackingClient := client.NewHTTPTrackingClient(cfg.TrackingSvcURL)
+	pricingClient := client.NewHTTPPricingClient(cfg.PricingSvcURL)
 
 	// 3. Setup Service
 	orderService := order.NewService(orderRepo, trackingClient, pricingClient)
@@ -49,35 +56,61 @@ func main() {
 		vars := mux.Vars(r)
 		resiID := vars["resiID"]
 		if resiID == "" {
-			http.Error(w, "resiID is required", http.StatusBadRequest)
+			response.BadRequest(w, "resiID is required")
 			return
 		}
 
 		exists, err := orderRepo.ValidateResi(resiID)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			response.InternalServerError(w, err.Error())
 			return
 		}
 		if !exists {
-			http.NotFound(w, r)
+			response.NotFound(w, "resi not found")
 			return
 		}
 
+		response.OK(w, map[string]string{"status": "valid"})
+	}).Methods("GET")
+
+	// Health check endpoint
+	router.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"status":"valid"}`))
+		w.Write([]byte(`{"status":"UP","service":"order"}`))
 	}).Methods("GET")
 
 	// 6. Start Server
-	port := ":" + getEnv("PORT", "8081") // Order service uses port 8081
-	log.Printf("Order Service is running on port %s", port)
-	if err := http.ListenAndServe(port, router); err != nil {
-		log.Fatalf("Failed to start server: %v", err)
-	}
-}
+	port := ":" + cfg.Port
 
-func getEnv(key, fallback string) string {
-	if value, exists := os.LookupEnv(key); exists {
-		return value
+	srv := &http.Server{
+		Addr:         port,
+		Handler:      middleware.CORS(router),
+		ReadTimeout:  10 * time.Second,
+		WriteTimeout: 10 * time.Second,
+		IdleTimeout:  60 * time.Second,
 	}
-	return fallback
+
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	go func() {
+		log.Printf("Order Service is running on port %s", port)
+		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			log.Printf("Failed to start server: %v", err)
+		}
+	}()
+
+	<-ctx.Done()
+	stop()
+	log.Println("Shutting down gracefully, press Ctrl+C again to force")
+
+	timeoutCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	if err := srv.Shutdown(timeoutCtx); err != nil {
+		log.Printf("Server forced to shutdown: %v", err)
+	}
+
+	log.Println("Server exiting")
 }

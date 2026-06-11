@@ -1,14 +1,21 @@
 package main
 
 import (
+	"context"
+	"errors"
 	"log"
 	"net/http"
 	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
 	"github.com/gorilla/mux"
 	// Import Handler dan Logika Tracking dari folder internal kelompok
 
+	"github.com/tubes-cc/logistics/internal/config"
 	"github.com/tubes-cc/logistics/internal/handler"
+	"github.com/tubes-cc/logistics/internal/middleware"
 	"github.com/tubes-cc/logistics/internal/tracking"
 
 	"gorm.io/driver/sqlite"
@@ -18,7 +25,9 @@ import (
 func main() {
 	log.Println("Starting Tracking Service...")
 
-	db, err := gorm.Open(sqlite.Open("tracking.db"), &gorm.Config{})
+	cfg := config.LoadTrackingConfig()
+
+	db, err := gorm.Open(sqlite.Open(cfg.DBPath), &gorm.Config{})
 	if err != nil {
 		log.Fatalf("Failed to connect to tracking database: %v", err)
 	}
@@ -38,16 +47,43 @@ func main() {
 	r.HandleFunc("/track", handler.HandleSendTrackingHTTP(*trackingService)).Methods("POST")
 	r.HandleFunc("/events", handler.HandleSendTrackingHTTP(*trackingService)).Methods("POST")
 
-	port := ":" + getEnv("PORT", "8083") // Tracking service uses port 8083
-	log.Printf("Tracking Service is running on port %s", port)
-	if err := http.ListenAndServe(port, r); err != nil {
-		log.Fatalf("Failed to start server: %v", err)
-	}
-}
+	// Health check endpoint
+	r.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"status":"UP","service":"tracking"}`))
+	}).Methods("GET")
 
-func getEnv(key, fallback string) string {
-	if value, exists := os.LookupEnv(key); exists {
-		return value
+	port := ":" + cfg.Port
+
+	srv := &http.Server{
+		Addr:         port,
+		Handler:      middleware.CORS(r),
+		ReadTimeout:  10 * time.Second,
+		WriteTimeout: 10 * time.Second,
+		IdleTimeout:  60 * time.Second,
 	}
-	return fallback
+
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	go func() {
+		log.Printf("Tracking Service is running on port %s", port)
+		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			log.Printf("Failed to start server: %v", err)
+		}
+	}()
+
+	<-ctx.Done()
+	stop()
+	log.Println("Shutting down gracefully, press Ctrl+C again to force")
+
+	timeoutCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	if err := srv.Shutdown(timeoutCtx); err != nil {
+		log.Printf("Server forced to shutdown: %v", err)
+	}
+
+	log.Println("Server exiting")
 }

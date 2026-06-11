@@ -6,6 +6,7 @@ import (
 
 	models "github.com/tubes-cc/logistics/domain"
 	"github.com/tubes-cc/logistics/internal/auth"
+	"github.com/tubes-cc/logistics/internal/response"
 )
 
 type validateRequest struct {
@@ -20,50 +21,46 @@ type validateResponse struct {
 func HandleLogin(s auth.AuthService) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
-			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			response.MethodNotAllowed(w, "method not allowed")
 			return
 		}
 
 		var req models.LoginRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			http.Error(w, "invalid request body", http.StatusBadRequest)
+			response.BadRequest(w, "invalid request body")
 			return
 		}
 
 		token, err := s.Login(req.Email, req.Password)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusUnauthorized)
+			response.Unauthorized(w, err.Error())
 			return
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(models.LoginResponse{Token: token})
+		response.OK(w, models.LoginResponse{Token: token})
 	}
 }
 
 func HandleRegister(s auth.AuthService) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
-			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			response.MethodNotAllowed(w, "method not allowed")
 			return
 		}
 
 		var req models.RegisterRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			http.Error(w, "invalid request body", http.StatusBadRequest)
+			response.BadRequest(w, "invalid request body")
 			return
 		}
 
 		user, err := s.Register(req.FullName, req.Email, req.Password)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
+			response.BadRequest(w, err.Error())
 			return
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusCreated)
-		json.NewEncoder(w).Encode(models.RegisterResponse{
+		response.Created(w, models.RegisterResponse{
 			ID:        user.ID,
 			Email:     user.Email,
 			FullName:  user.FullName,
@@ -76,25 +73,23 @@ func HandleRegister(s auth.AuthService) http.HandlerFunc {
 func HandleValidateToken(s auth.AuthService) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
-			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			response.MethodNotAllowed(w, "method not allowed")
 			return
 		}
 
 		var req validateRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			http.Error(w, "invalid request body", http.StatusBadRequest)
+			response.BadRequest(w, "invalid request body")
 			return
 		}
 
 		claims, err := s.ValidateToken(req.Token)
 		if err != nil {
-			http.Error(w, "invalid token: "+err.Error(), http.StatusUnauthorized)
+			response.Unauthorized(w, "invalid token: "+err.Error())
 			return
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(validateResponse{
+		response.OK(w, validateResponse{
 			UserID: claims.UserID,
 			Role:   string(claims.Role),
 		})

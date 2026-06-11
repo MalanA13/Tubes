@@ -1,0 +1,835 @@
+openapi: 3.0.0
+info:
+  title: Logistics Microservices API
+  version: 2.0.0
+  description: |
+    Complete endpoint inventory for Logistics Microservices
+    (Auth, Order, Pricing, Tracking, Hub, Courier, Notification).
+
+    ## Standard Response Format
+
+    All API responses (except /health) follow a standard envelope:
+
+    **Success:**
+    ```json
+    {
+      "success": true,
+      "data": { ... }
+    }
+    ```
+
+    **Error:**
+    ```json
+    {
+      "success": false,
+      "error": {
+        "code": "BAD_REQUEST",
+        "message": "description of the error"
+      }
+    }
+    ```
+servers:
+  - url: /
+    description: Base URL for all microservices
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    TrackingStatus:
+      type: string
+      enum:
+        - CREATED
+        - IN_HUB
+        - IN_TRANSIT
+        - OUT_DELIVERY
+        - DELIVERED
+        - FAILED
+        - RETURNED
+    ServiceType:
+      type: string
+      enum:
+        - REGULAR
+        - EXPRESS
+        - SAMEDAY
+        - NEXTDAY
+
+    # ----- Standard Envelope Schemas -----
+    ErrorDetail:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          type: string
+          description: Machine-readable error code
+          example: BAD_REQUEST
+        message:
+          type: string
+          description: Human-readable error message
+          example: invalid request body
+
+    ErrorResponse:
+      type: object
+      required: [success, error]
+      properties:
+        success:
+          type: boolean
+          example: false
+        error:
+          $ref: '#/components/schemas/ErrorDetail'
+
+    # ----- Auth Schemas -----
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+    LoginResponseData:
+      type: object
+      properties:
+        token:
+          type: string
+    LoginResponse:
+      type: object
+      required: [success, data]
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          $ref: '#/components/schemas/LoginResponseData'
+
+    RegisterRequest:
+      type: object
+      required: [full_name, email, password]
+      properties:
+        full_name:
+          type: string
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+    RegisterResponseData:
+      type: object
+      properties:
+        id:
+          type: integer
+        email:
+          type: string
+        full_name:
+          type: string
+        role:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+    RegisterResponse:
+      type: object
+      required: [success, data]
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          $ref: '#/components/schemas/RegisterResponseData'
+
+    ValidateTokenRequest:
+      type: object
+      required: [token]
+      properties:
+        token:
+          type: string
+    ValidateTokenResponseData:
+      type: object
+      properties:
+        user_id:
+          type: string
+        role:
+          type: string
+    ValidateTokenResponse:
+      type: object
+      required: [success, data]
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          $ref: '#/components/schemas/ValidateTokenResponseData'
+
+    # ----- Order Schemas -----
+    OrderRequest:
+      type: object
+      required: [sender_name, recipient_name, origin, destination, weight, dimensions, item_type, service_type, distance]
+      properties:
+        sender_name:
+          type: string
+        recipient_name:
+          type: string
+        origin:
+          type: string
+        destination:
+          type: string
+        weight:
+          type: number
+        dimensions:
+          type: string
+        item_type:
+          type: string
+        service_type:
+          $ref: '#/components/schemas/ServiceType'
+        distance:
+          type: number
+    OrderResponseData:
+      type: object
+      properties:
+        order_id:
+          type: string
+        resi_id:
+          type: string
+        status:
+          $ref: '#/components/schemas/TrackingStatus'
+        total_cost:
+          type: number
+    OrderResponse:
+      type: object
+      required: [success, data]
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          $ref: '#/components/schemas/OrderResponseData'
+
+    ValidateResiResponseData:
+      type: object
+      properties:
+        status:
+          type: string
+          example: valid
+    ValidateResiResponse:
+      type: object
+      required: [success, data]
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          $ref: '#/components/schemas/ValidateResiResponseData'
+
+    # ----- Pricing Schemas -----
+    PricingRequest:
+      type: object
+      required: [origin, destination, weight, distance, service_type]
+      properties:
+        origin:
+          type: string
+        destination:
+          type: string
+        weight:
+          type: number
+        distance:
+          type: number
+        service_type:
+          $ref: '#/components/schemas/ServiceType'
+    PricingResponseData:
+      type: object
+      properties:
+        total_cost:
+          type: number
+        base_cost:
+          type: number
+    PricingResponse:
+      type: object
+      required: [success, data]
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          $ref: '#/components/schemas/PricingResponseData'
+
+    # ----- Tracking Schemas -----
+    TrackingRequest:
+      type: object
+      required: [resi_id, status, location, note]
+      properties:
+        resi_id:
+          type: string
+        status:
+          $ref: '#/components/schemas/TrackingStatus'
+        location:
+          type: string
+        note:
+          type: string
+    TrackingResponseData:
+      type: object
+      properties:
+        message:
+          type: string
+          example: tracking event added
+    TrackingResponse:
+      type: object
+      required: [success, data]
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          $ref: '#/components/schemas/TrackingResponseData'
+
+    # ----- Notification Schemas -----
+    NotifyRequest:
+      type: object
+      required: [user_id, message, type]
+      properties:
+        user_id:
+          type: string
+        message:
+          type: string
+        type:
+          type: string
+          enum: [EMAIL, SMS]
+    NotifyResponseData:
+      type: object
+      properties:
+        status:
+          type: string
+        message:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+    NotifyResponse:
+      type: object
+      required: [success, data]
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          $ref: '#/components/schemas/NotifyResponseData'
+
+    # ----- Hub Schemas -----
+    ScanRequest:
+      type: object
+      required: [resi_id, hub_id]
+      properties:
+        resi_id:
+          type: string
+        hub_id:
+          type: string
+    MessageData:
+      type: object
+      properties:
+        message:
+          type: string
+    SuccessMessageResponse:
+      type: object
+      required: [success, data]
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          $ref: '#/components/schemas/MessageData'
+
+    # ----- Courier Schemas -----
+    AssignCourierRequest:
+      type: object
+      required: [resi_id, courier_id]
+      properties:
+        resi_id:
+          type: string
+        courier_id:
+          type: string
+    DeliveryStatusRequest:
+      type: object
+      required: [resi_id, status, proof_url]
+      properties:
+        resi_id:
+          type: string
+        status:
+          $ref: '#/components/schemas/TrackingStatus'
+        proof_url:
+          type: string
+
+    # ----- Health (NOT wrapped) -----
+    HealthResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          example: UP
+        service:
+          type: string
+
+paths:
+  # -------------------------
+  # Auth Service
+  # -------------------------
+  /login:
+    post:
+      summary: Login user
+      tags: [Auth]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /register:
+    post:
+      summary: Register new user
+      tags: [Auth]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+      responses:
+        '201':
+          description: User registered
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RegisterResponse'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /auth/validate:
+    post:
+      summary: Validate JWT token
+      tags: [Auth]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ValidateTokenRequest'
+      responses:
+        '200':
+          description: Token is valid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidateTokenResponse'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Invalid token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  # -------------------------
+  # Order Service
+  # -------------------------
+  /order:
+    post:
+      summary: Create a new order
+      tags: [Order]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OrderRequest'
+      responses:
+        '201':
+          description: Order created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderResponse'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /orders/{resiID}/validate:
+    get:
+      summary: Validate Resi ID
+      tags: [Order]
+      parameters:
+        - in: path
+          name: resiID
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Resi ID is valid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidateResiResponse'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Resi ID not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  # -------------------------
+  # Pricing Service
+  # -------------------------
+  /pricing:
+    post:
+      summary: Calculate price
+      tags: [Pricing]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PricingRequest'
+      responses:
+        '200':
+          description: Price calculated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PricingResponse'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  # -------------------------
+  # Tracking Service
+  # -------------------------
+  /track:
+    post:
+      summary: Add tracking event
+      tags: [Tracking]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TrackingRequest'
+      responses:
+        '201':
+          description: Tracking event added
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TrackingResponse'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /events:
+    post:
+      summary: Add tracking event (alias for /track)
+      tags: [Tracking]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TrackingRequest'
+      responses:
+        '201':
+          description: Tracking event added
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TrackingResponse'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  # -------------------------
+  # Notification Service
+  # -------------------------
+  /notify:
+    post:
+      summary: Send notification
+      tags: [Notification]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NotifyRequest'
+      responses:
+        '201':
+          description: Notification sent successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotifyResponse'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  # -------------------------
+  # Hub Service
+  # -------------------------
+  /hub/scan-in:
+    post:
+      summary: Scan in shipment at hub
+      tags: [Hub]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ScanRequest'
+      responses:
+        '200':
+          description: Scan-in successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessMessageResponse'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /hub/scan-out:
+    post:
+      summary: Scan out shipment from hub
+      tags: [Hub]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ScanRequest'
+      responses:
+        '200':
+          description: Scan-out successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessMessageResponse'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  # -------------------------
+  # Courier Service
+  # -------------------------
+  /courier/assign:
+    post:
+      summary: Assign courier to shipment
+      tags: [Courier]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AssignCourierRequest'
+      responses:
+        '200':
+          description: Courier assigned
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessMessageResponse'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /courier/delivery-status:
+    post:
+      summary: Update delivery status
+      tags: [Courier]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DeliveryStatusRequest'
+      responses:
+        '200':
+          description: Delivery status updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessMessageResponse'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  # -------------------------
+  # Health Checks (NOT wrapped in envelope)
+  # -------------------------
+  /health:
+    get:
+      summary: Service health check
+      tags: [Health]
+      description: |
+        This endpoint exists on all services (auth, order, pricing, tracking, hub, courier, notification).
+        Health responses are NOT wrapped in the standard envelope.
+      responses:
+        '200':
+          description: Service is UP
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'

@@ -5,8 +5,9 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/tubes-cc/logistics/internal/courier"
 	"github.com/tubes-cc/logistics/domain"
+	"github.com/tubes-cc/logistics/internal/courier"
+	"github.com/tubes-cc/logistics/internal/response"
 )
 
 // CourierHandler menangani semua HTTP request untuk Courier Service.
@@ -43,22 +44,22 @@ type deliveryStatusRequest struct {
 //	{"status": "ok", "message": "Kurir berhasil ditugaskan"}
 func (h *CourierHandler) AssignCourier(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		writeError(w, http.StatusMethodNotAllowed, "gunakan POST")
+		response.MethodNotAllowed(w, "gunakan POST")
 		return
 	}
 
 	var req assignRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeError(w, http.StatusBadRequest, "body request tidak valid JSON")
+		response.BadRequest(w, "body request tidak valid JSON")
 		return
 	}
 
 	if err := h.service.AssignCourier(r.Context(), req.ResiID, req.CourierID); err != nil {
-		writeError(w, http.StatusBadRequest, err.Error())
+		response.BadRequest(w, err.Error())
 		return
 	}
 
-	writeSuccess(w, "Kurir berhasil ditugaskan")
+	response.OK(w, map[string]string{"message": "Kurir berhasil ditugaskan"})
 }
 
 // UpdateDeliveryStatus menangani POST /courier/delivery-status
@@ -70,20 +71,20 @@ func (h *CourierHandler) AssignCourier(w http.ResponseWriter, r *http.Request) {
 // Status yang valid: DELIVERED (wajib proof_url), FAILED, RETURNED
 func (h *CourierHandler) UpdateDeliveryStatus(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		writeError(w, http.StatusMethodNotAllowed, "gunakan POST")
+		response.MethodNotAllowed(w, "gunakan POST")
 		return
 	}
 
 	var req deliveryStatusRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeError(w, http.StatusBadRequest, "body request tidak valid JSON")
+		response.BadRequest(w, "body request tidak valid JSON")
 		return
 	}
 
 	if err := h.service.UpdateDeliveryStatus(r.Context(), req.ResiID, req.Status, req.ProofURL); err != nil {
-		writeError(w, http.StatusBadRequest, err.Error())
+		response.BadRequest(w, err.Error())
 		return
 	}
 
-	writeSuccess(w, "Status pengiriman berhasil diperbarui")
+	response.OK(w, map[string]string{"message": "Status pengiriman berhasil diperbarui"})
 }
