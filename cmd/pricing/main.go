@@ -3,7 +3,7 @@ package main
 import (
 	"context"
 	"errors"
-	"log"
+	"fmt"
 	"net/http"
 	"os"
 	"os/signal"
@@ -14,34 +14,43 @@ import (
 	// Import Handler dan Logika Pricing dari folder internal kelompok
 
 	"github.com/tubes-cc/logistics/domain"
+	"github.com/tubes-cc/logistics/internal/logger"
 	"github.com/tubes-cc/logistics/internal/config"
 	"github.com/tubes-cc/logistics/internal/handler"
 	"github.com/tubes-cc/logistics/internal/middleware"
 	"github.com/tubes-cc/logistics/internal/pricing"
+
+	"go.uber.org/zap"
 
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 )
 
 func main() {
-	log.Println("Starting Pricing Service...")
+	loggerInstance, err := logger.InitLogger("pricing")
+	if err != nil {
+		zap.L().Fatal("Failed to initialize logger", zap.Error(err))
+	}
+	defer loggerInstance.Sync()
+
+	zap.L().Info("Starting Pricing Service...")
 
 	cfg := config.LoadPricingConfig()
 
 	db, err := gorm.Open(sqlite.Open(cfg.DBPath), &gorm.Config{})
 	if err != nil {
-		log.Fatalf("Failed to connect to pricing database: %v", err)
+		zap.L().Fatal("Failed to connect to pricing database", zap.Error(err))
 	}
 
 	// Auto-migrate Tariff model
 	if err := db.AutoMigrate(&pricing.Tariff{}); err != nil {
-		log.Fatalf("Failed to auto-migrate Tariff table: %v", err)
+		zap.L().Fatal("Failed to auto-migrate Tariff table", zap.Error(err))
 	}
 
 	// Seed default tariff data if empty
 	var count int64
 	if err := db.Model(&pricing.Tariff{}).Count(&count).Error; err == nil && count == 0 {
-		log.Println("Seeding default tariffs...")
+		zap.L().Info("Seeding default tariffs...")
 		defaultTariffs := []pricing.Tariff{
 			{Origin: "Jakarta", Destination: "Bandung", ServiceType: domain.ServiceExpress, BaseCost: 10000.0},
 			{Origin: "Jakarta", Destination: "Jakarta", ServiceType: domain.ServiceSameday, BaseCost: 2000.0},
@@ -51,7 +60,7 @@ func main() {
 		}
 		for _, t := range defaultTariffs {
 			if err := db.Create(&t).Error; err != nil {
-				log.Printf("Failed to seed tariff %s -> %s (%s): %v", t.Origin, t.Destination, t.ServiceType, err)
+				zap.L().Info(fmt.Sprintf("Failed to seed tariff %s -> %s (%s)): %v", t.Origin, t.Destination, t.ServiceType, err))
 			}
 		}
 	}
@@ -76,7 +85,7 @@ func main() {
 
 	srv := &http.Server{
 		Addr:         port,
-		Handler:      middleware.CORS(r),
+		Handler:      middleware.CORS(middleware.RequestIDMiddleware(middleware.LoggingMiddleware(r))),
 		ReadTimeout:  10 * time.Second,
 		WriteTimeout: 10 * time.Second,
 		IdleTimeout:  60 * time.Second,
@@ -86,22 +95,22 @@ func main() {
 	defer stop()
 
 	go func() {
-		log.Printf("Pricing Service is running on port %s", port)
+		zap.L().Info(fmt.Sprintf("Pricing Service is running on port %s", port))
 		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			log.Printf("Failed to start server: %v", err)
+			zap.L().Error("Failed to start server", zap.Error(err))
 		}
 	}()
 
 	<-ctx.Done()
 	stop()
-	log.Println("Shutting down gracefully, press Ctrl+C again to force")
+	zap.L().Info("Shutting down gracefully, press Ctrl+C again to force")
 
 	timeoutCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
 	if err := srv.Shutdown(timeoutCtx); err != nil {
-		log.Printf("Server forced to shutdown: %v", err)
+		zap.L().Error("Server forced to shutdown", zap.Error(err))
 	}
 
-	log.Println("Server exiting")
+	zap.L().Info("Server exiting")
 }

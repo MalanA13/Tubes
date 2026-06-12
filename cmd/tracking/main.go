@@ -3,7 +3,7 @@ package main
 import (
 	"context"
 	"errors"
-	"log"
+	"fmt"
 	"net/http"
 	"os"
 	"os/signal"
@@ -13,28 +13,37 @@ import (
 	"github.com/gorilla/mux"
 	// Import Handler dan Logika Tracking dari folder internal kelompok
 
+	"github.com/tubes-cc/logistics/internal/logger"
 	"github.com/tubes-cc/logistics/internal/config"
 	"github.com/tubes-cc/logistics/internal/handler"
 	"github.com/tubes-cc/logistics/internal/middleware"
 	"github.com/tubes-cc/logistics/internal/tracking"
+
+	"go.uber.org/zap"
 
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 )
 
 func main() {
-	log.Println("Starting Tracking Service...")
+	loggerInstance, err := logger.InitLogger("tracking")
+	if err != nil {
+		zap.L().Fatal("Failed to initialize logger", zap.Error(err))
+	}
+	defer loggerInstance.Sync()
+
+	zap.L().Info("Starting Tracking Service...")
 
 	cfg := config.LoadTrackingConfig()
 
 	db, err := gorm.Open(sqlite.Open(cfg.DBPath), &gorm.Config{})
 	if err != nil {
-		log.Fatalf("Failed to connect to tracking database: %v", err)
+		zap.L().Fatal("Failed to connect to tracking database", zap.Error(err))
 	}
 
 	// Auto-migrate Tracking models
 	if err := db.AutoMigrate(&tracking.TrackingEventModel{}, &tracking.ShipmentModel{}); err != nil {
-		log.Fatalf("Failed to auto-migrate tracking tables: %v", err)
+		zap.L().Fatal("Failed to auto-migrate tracking tables", zap.Error(err))
 	}
 
 	r := mux.NewRouter()
@@ -58,7 +67,7 @@ func main() {
 
 	srv := &http.Server{
 		Addr:         port,
-		Handler:      middleware.CORS(r),
+		Handler:      middleware.CORS(middleware.RequestIDMiddleware(middleware.LoggingMiddleware(r))),
 		ReadTimeout:  10 * time.Second,
 		WriteTimeout: 10 * time.Second,
 		IdleTimeout:  60 * time.Second,
@@ -68,22 +77,22 @@ func main() {
 	defer stop()
 
 	go func() {
-		log.Printf("Tracking Service is running on port %s", port)
+		zap.L().Info(fmt.Sprintf("Tracking Service is running on port %s", port))
 		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			log.Printf("Failed to start server: %v", err)
+			zap.L().Error("Failed to start server", zap.Error(err))
 		}
 	}()
 
 	<-ctx.Done()
 	stop()
-	log.Println("Shutting down gracefully, press Ctrl+C again to force")
+	zap.L().Info("Shutting down gracefully, press Ctrl+C again to force")
 
 	timeoutCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
 	if err := srv.Shutdown(timeoutCtx); err != nil {
-		log.Printf("Server forced to shutdown: %v", err)
+		zap.L().Error("Server forced to shutdown", zap.Error(err))
 	}
 
-	log.Println("Server exiting")
+	zap.L().Info("Server exiting")
 }

@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/tubes-cc/logistics/domain"
+	"github.com/tubes-cc/logistics/internal/contextutil"
 )
 
 // ================================================================
@@ -46,6 +47,9 @@ func (c *HTTPTrackingClient) AddTrackingEvent(ctx context.Context, event *domain
 		return fmt.Errorf("tracking client: buat request: %w", err)
 	}
 	req.Header.Set("Content-Type", "application/json")
+	if reqID := contextutil.GetRequestID(ctx); reqID != "" {
+		req.Header.Set(contextutil.RequestIDHeader, reqID)
+	}
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
@@ -90,6 +94,9 @@ func (c *HTTPPricingClient) CalculatePrice(ctx context.Context, req domain.Prici
 		return nil, fmt.Errorf("pricing client: buat request: %w", err)
 	}
 	httpReq.Header.Set("Content-Type", "application/json")
+	if reqID := contextutil.GetRequestID(ctx); reqID != "" {
+		httpReq.Header.Set(contextutil.RequestIDHeader, reqID)
+	}
 
 	resp, err := c.httpClient.Do(httpReq)
 	if err != nil {
@@ -133,6 +140,9 @@ func (c *HTTPOrderClient) ValidateResi(ctx context.Context, resiID string) error
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return fmt.Errorf("order client: buat request: %w", err)
+	}
+	if reqID := contextutil.GetRequestID(ctx); reqID != "" {
+		req.Header.Set(contextutil.RequestIDHeader, reqID)
 	}
 
 	resp, err := c.httpClient.Do(req)
@@ -188,6 +198,9 @@ func (c *HTTPAuthClient) ValidateToken(ctx context.Context, token string) (*doma
 		return nil, fmt.Errorf("auth client: buat request: %w", err)
 	}
 	req.Header.Set("Content-Type", "application/json")
+	if reqID := contextutil.GetRequestID(ctx); reqID != "" {
+		req.Header.Set(contextutil.RequestIDHeader, reqID)
+	}
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {

@@ -3,7 +3,7 @@ package main
 import (
 	"context"
 	"errors"
-	"log"
+	"fmt"
 	"net/http"
 	"os"
 	"os/signal"
@@ -12,28 +12,37 @@ import (
 
 	"github.com/gorilla/mux"
 	models "github.com/tubes-cc/logistics/domain"
+	"github.com/tubes-cc/logistics/internal/logger"
 	"github.com/tubes-cc/logistics/internal/config"
 	"github.com/tubes-cc/logistics/internal/handler"
 	"github.com/tubes-cc/logistics/internal/middleware"
 	"github.com/tubes-cc/logistics/internal/notification"
+
+	"go.uber.org/zap"
 
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 )
 
 func main() {
-	log.Println("Starting Notification Service...")
+	loggerInstance, err := logger.InitLogger("notification")
+	if err != nil {
+		zap.L().Fatal("Failed to initialize logger", zap.Error(err))
+	}
+	defer loggerInstance.Sync()
+
+	zap.L().Info("Starting Notification Service...")
 
 	cfg := config.LoadNotificationConfig()
 
 	db, err := gorm.Open(sqlite.Open(cfg.DBPath), &gorm.Config{})
 	if err != nil {
-		log.Fatalf("Failed to connect to notification database: %v", err)
+		zap.L().Fatal("Failed to connect to notification database", zap.Error(err))
 	}
 
 	// Auto-migrate: creates the notifications table if it doesn't exist
 	if err := db.AutoMigrate(&models.Notification{}); err != nil {
-		log.Fatalf("Failed to auto-migrate notification table: %v", err)
+		zap.L().Fatal("Failed to auto-migrate notification table", zap.Error(err))
 	}
 
 	// Initialize Repository and Service
@@ -56,7 +65,7 @@ func main() {
 
 	srv := &http.Server{
 		Addr:         port,
-		Handler:      middleware.CORS(r),
+		Handler:      middleware.CORS(middleware.RequestIDMiddleware(middleware.LoggingMiddleware(r))),
 		ReadTimeout:  10 * time.Second,
 		WriteTimeout: 10 * time.Second,
 		IdleTimeout:  60 * time.Second,
@@ -66,22 +75,22 @@ func main() {
 	defer stop()
 
 	go func() {
-		log.Printf("Notification Service is running on port %s", port)
+		zap.L().Info(fmt.Sprintf("Notification Service is running on port %s", port))
 		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			log.Printf("Failed to start server: %v", err)
+			zap.L().Error("Failed to start server", zap.Error(err))
 		}
 	}()
 
 	<-ctx.Done()
 	stop()
-	log.Println("Shutting down gracefully, press Ctrl+C again to force")
+	zap.L().Info("Shutting down gracefully, press Ctrl+C again to force")
 
 	timeoutCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
 	if err := srv.Shutdown(timeoutCtx); err != nil {
-		log.Printf("Server forced to shutdown: %v", err)
+		zap.L().Error("Server forced to shutdown", zap.Error(err))
 	}
 
-	log.Println("Server exiting")
+	zap.L().Info("Server exiting")
 }

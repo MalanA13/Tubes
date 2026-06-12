@@ -3,7 +3,7 @@ package main
 import (
 	"context"
 	"errors"
-	"log"
+	"fmt"
 	"net/http"
 	"os"
 	"os/signal"
@@ -14,30 +14,39 @@ import (
 	// Import Handler dan Logika Pricing dari folder internal kelompok
 
 	"github.com/tubes-cc/logistics/client"
+	"github.com/tubes-cc/logistics/internal/logger"
 	"github.com/tubes-cc/logistics/internal/config"
 	"github.com/tubes-cc/logistics/internal/handler"
 	"github.com/tubes-cc/logistics/internal/middleware"
 	"github.com/tubes-cc/logistics/internal/order"
 	"github.com/tubes-cc/logistics/internal/response"
 
+	"go.uber.org/zap"
+
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 )
 
 func main() {
-	log.Println("Starting Ordering Service...")
+	loggerInstance, err := logger.InitLogger("order")
+	if err != nil {
+		zap.L().Fatal("Failed to initialize logger", zap.Error(err))
+	}
+	defer loggerInstance.Sync()
+
+	zap.L().Info("Starting Ordering Service...")
 
 	cfg := config.LoadOrderConfig()
 
 	// 1. Setup Database & Repository
 	db, err := gorm.Open(sqlite.Open(cfg.DBPath), &gorm.Config{})
 	if err != nil {
-		log.Fatalf("Failed to open database: %v", err)
+		zap.L().Fatal("Failed to open database", zap.Error(err))
 	}
 
 	orderRepo, err := order.NewOrderRepository(db)
 	if err != nil {
-		log.Fatalf("Failed to initialize repository: %v", err)
+		zap.L().Fatal("Failed to initialize repository", zap.Error(err))
 	}
 
 	// 2. Setup Clients (Inter-service communication)
@@ -85,7 +94,7 @@ func main() {
 
 	srv := &http.Server{
 		Addr:         port,
-		Handler:      middleware.CORS(router),
+		Handler:      middleware.CORS(middleware.RequestIDMiddleware(middleware.LoggingMiddleware(router))),
 		ReadTimeout:  10 * time.Second,
 		WriteTimeout: 10 * time.Second,
 		IdleTimeout:  60 * time.Second,
@@ -95,22 +104,22 @@ func main() {
 	defer stop()
 
 	go func() {
-		log.Printf("Order Service is running on port %s", port)
+		zap.L().Info(fmt.Sprintf("Order Service is running on port %s", port))
 		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			log.Printf("Failed to start server: %v", err)
+			zap.L().Error("Failed to start server", zap.Error(err))
 		}
 	}()
 
 	<-ctx.Done()
 	stop()
-	log.Println("Shutting down gracefully, press Ctrl+C again to force")
+	zap.L().Info("Shutting down gracefully, press Ctrl+C again to force")
 
 	timeoutCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
 	if err := srv.Shutdown(timeoutCtx); err != nil {
-		log.Printf("Server forced to shutdown: %v", err)
+		zap.L().Error("Server forced to shutdown", zap.Error(err))
 	}
 
-	log.Println("Server exiting")
+	zap.L().Info("Server exiting")
 }
