@@ -64,6 +64,87 @@ func (c *HTTPTrackingClient) AddTrackingEvent(ctx context.Context, event *domain
 	return nil
 }
 
+// GetCurrentStatus mengambil status paket terkini dari Tracking Service via GET.
+// Jika paket belum punya snapshot (404), dikembalikan domain.StatusCreated.
+func (c *HTTPTrackingClient) GetCurrentStatus(ctx context.Context, resiID string) (domain.TrackingStatus, error) {
+	url := fmt.Sprintf("%s/tracking/%s/status", c.baseURL, resiID)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return "", fmt.Errorf("tracking client: buat request status: %w", err)
+	}
+	if reqID := contextutil.GetRequestID(ctx); reqID != "" {
+		req.Header.Set(contextutil.RequestIDHeader, reqID)
+	}
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("tracking client: kirim request status: %w", err)
+	}
+	defer resp.Body.Close()
+
+	// 404 means no snapshot exists yet — resi was just created
+	if resp.StatusCode == http.StatusNotFound {
+		return domain.StatusCreated, nil
+	}
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("tracking client: status tidak OK: %d", resp.StatusCode)
+	}
+
+	// Decode {"success":true,"data":{"resi_id":"...","status":"..."}}
+	var wrapper struct {
+		Success bool `json:"success"`
+		Data    struct {
+			ResiID string `json:"resi_id"`
+			Status string `json:"status"`
+		} `json:"data"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&wrapper); err != nil {
+		return "", fmt.Errorf("tracking client: decode response: %w", err)
+	}
+
+	return domain.TrackingStatus(wrapper.Data.Status), nil
+}
+
+// GetTrackingHistory mengambil semua tracking event dari Tracking Service.
+// Jika paket belum punya event (404), dikembalikan slice kosong bukan error.
+func (c *HTTPTrackingClient) GetTrackingHistory(ctx context.Context, resiID string) ([]domain.TrackingEvent, error) {
+	url := fmt.Sprintf("%s/tracking/%s", c.baseURL, resiID)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("tracking client: buat request history: %w", err)
+	}
+	if reqID := contextutil.GetRequestID(ctx); reqID != "" {
+		req.Header.Set(contextutil.RequestIDHeader, reqID)
+	}
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("tracking client: kirim request history: %w", err)
+	}
+	defer resp.Body.Close()
+
+	// 404 means no events yet — fresh resi
+	if resp.StatusCode == http.StatusNotFound {
+		return []domain.TrackingEvent{}, nil
+	}
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("tracking client: history status tidak OK: %d", resp.StatusCode)
+	}
+
+	// Decode {"success":true,"data":[...events...]}
+	var wrapper struct {
+		Success bool                   `json:"success"`
+		Data    []domain.TrackingEvent `json:"data"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&wrapper); err != nil {
+		return nil, fmt.Errorf("tracking client: decode history response: %w", err)
+	}
+	if wrapper.Data == nil {
+		return []domain.TrackingEvent{}, nil
+	}
+	return wrapper.Data, nil
+}
+
 // ================================================================
 // HTTPPricingClient — implementasi PricingClient via HTTP
 // ================================================================

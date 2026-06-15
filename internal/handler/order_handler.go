@@ -47,6 +47,25 @@ func toOrderDetailResponse(m *order.OrderModel) orderDetailResponse {
 	}
 }
 
+// toOrderDetailResponseWithStatus maps an OrderModel to an orderDetailResponse,
+// overriding the status with the provided live status from Tracking Service.
+func toOrderDetailResponseWithStatus(m *order.OrderModel, status domain.TrackingStatus) orderDetailResponse {
+	return orderDetailResponse{
+		OrderID:       m.OrderID,
+		ResiID:        m.ResiID,
+		SenderName:    m.SenderName,
+		RecipientName: m.RecipientName,
+		Origin:        m.Origin,
+		Destination:   m.Destination,
+		Weight:        m.Weight,
+		ItemType:      m.ItemType,
+		ServiceType:   m.ServiceType,
+		TotalCost:     m.TotalCost,
+		Status:        status, // live status from Tracking, not orderModel.Status
+		CreatedAt:     m.CreatedAt,
+	}
+}
+
 // HandleOrderHTTP handles order creation requests.
 func HandleOrderHTTP(service order.OrderService) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -101,7 +120,8 @@ func HandleGetOrderHTTP(service order.OrderService) http.HandlerFunc {
 			return
 		}
 
-		response.OK(w, toOrderDetailResponse(orderModel))
+		liveStatus := service.GetCurrentStatus(r.Context(), resiID, orderModel.Status)
+		response.OK(w, toOrderDetailResponseWithStatus(orderModel, liveStatus))
 	}
 }
 
@@ -122,9 +142,45 @@ func HandleListOrdersHTTP(service order.OrderService) http.HandlerFunc {
 
 		result := make([]orderDetailResponse, 0, len(orders))
 		for _, o := range orders {
-			result = append(result, toOrderDetailResponse(o))
+			liveStatus := service.GetCurrentStatus(r.Context(), o.ResiID, o.Status)
+			result = append(result, toOrderDetailResponseWithStatus(o, liveStatus))
 		}
 
 		response.OK(w, result)
+	}
+}
+
+// HandleGetOrderTrackingHTTP handles GET /orders/{resiID}/tracking.
+// Returns the customer-facing shipment timeline including current status and event history.
+// Requires authentication. Enforces order ownership (403 for foreign orders, 404 for missing).
+func HandleGetOrderTrackingHTTP(service order.OrderService) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		resiID := mux.Vars(r)["resiID"]
+		if resiID == "" {
+			response.BadRequest(w, "resiID is required")
+			return
+		}
+
+		claims, ok := r.Context().Value(contextutil.AuthClaimsKey).(*domain.AuthClaims)
+		if !ok || claims == nil {
+			response.Unauthorized(w, "authentication required")
+			return
+		}
+
+		tracking, err := service.GetOrderTracking(r.Context(), claims.UserID, resiID)
+		if err != nil {
+			if errors.Is(err, domain.ErrShipmentNotFound) {
+				response.NotFound(w, "order not found")
+				return
+			}
+			if errors.Is(err, domain.ErrForbidden) {
+				response.Forbidden(w, "access denied")
+				return
+			}
+			response.InternalServerError(w, err.Error())
+			return
+		}
+
+		response.OK(w, tracking)
 	}
 }

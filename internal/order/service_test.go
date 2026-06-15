@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/tubes-cc/logistics/domain"
@@ -186,5 +187,108 @@ func TestOrderService_Ownership(t *testing.T) {
 		result, err := service.ListOrdersByUserID("user-empty")
 		assert.NoError(t, err)
 		assert.Len(t, result, 0)
+	})
+}
+
+func TestOrderService_GetCurrentStatus(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockRepo := NewMockOrderRepository(ctrl)
+	mockPricing := NewMockPricingClient(ctrl)
+	mockTracking := NewMockTrackingClient(ctrl)
+
+	service := NewService(mockRepo, mockTracking, mockPricing)
+	ctx := context.Background()
+
+	t.Run("TrackerReturnsStatus", func(t *testing.T) {
+		mockTracking.EXPECT().GetCurrentStatus(ctx, "AWB-001").Return(domain.StatusDelivered, nil)
+		result := service.GetCurrentStatus(ctx, "AWB-001", domain.StatusCreated)
+		assert.Equal(t, domain.StatusDelivered, result)
+	})
+
+	t.Run("TrackerFails_ReturnsFallback", func(t *testing.T) {
+		mockTracking.EXPECT().GetCurrentStatus(ctx, "AWB-002").Return(domain.TrackingStatus(""), errors.New("tracking unavailable"))
+		result := service.GetCurrentStatus(ctx, "AWB-002", domain.StatusCreated)
+		assert.Equal(t, domain.StatusCreated, result)
+	})
+
+	t.Run("TrackerReturnsCreated_WhenFreshResi", func(t *testing.T) {
+		// Simulates the 404→CREATED path from HTTPTrackingClient
+		mockTracking.EXPECT().GetCurrentStatus(ctx, "AWB-003").Return(domain.StatusCreated, nil)
+		result := service.GetCurrentStatus(ctx, "AWB-003", domain.StatusCreated)
+		assert.Equal(t, domain.StatusCreated, result)
+	})
+}
+
+func TestOrderService_GetOrderTracking(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockRepo := NewMockOrderRepository(ctrl)
+	mockPricing := NewMockPricingClient(ctrl)
+	mockTracking := NewMockTrackingClient(ctrl)
+
+	service := NewService(mockRepo, mockTracking, mockPricing)
+	ctx := context.Background()
+
+	t.Run("Success_WithEvents", func(t *testing.T) {
+		// Arrange
+		mockRepo.EXPECT().GetOrderByResiID("AWB-001").Return(
+			&OrderModel{ResiID: "AWB-001", UserID: "user-1", Status: domain.StatusCreated}, nil,
+		)
+		mockTracking.EXPECT().GetCurrentStatus(ctx, "AWB-001").Return(domain.StatusInTransit, nil)
+		mockTracking.EXPECT().GetTrackingHistory(ctx, "AWB-001").Return([]domain.TrackingEvent{
+			{Status: domain.StatusCreated, Location: "Jakarta", Note: "Order Created", CreatedAt: time.Now()},
+			{Status: domain.StatusInHub, Location: "HUB-JKT-01", Note: "Arrived at hub", CreatedAt: time.Now()},
+			{Status: domain.StatusInTransit, Location: "HUB-JKT-01", Note: "Left hub", CreatedAt: time.Now()},
+		}, nil)
+
+		// Act
+		result, err := service.GetOrderTracking(ctx, "user-1", "AWB-001")
+
+		// Assert
+		assert.NoError(t, err)
+		assert.NotNil(t, result)
+		assert.Equal(t, "AWB-001", result.ResiID)
+		assert.Equal(t, domain.StatusInTransit, result.CurrentStatus)
+		assert.Len(t, result.Events, 3)
+		assert.Equal(t, domain.StatusCreated, result.Events[0].Status)
+		assert.Equal(t, "Jakarta", result.Events[0].Location)
+	})
+
+	t.Run("OrderNotFound", func(t *testing.T) {
+		mockRepo.EXPECT().GetOrderByResiID("AWB-999").Return(nil, nil)
+
+		result, err := service.GetOrderTracking(ctx, "user-1", "AWB-999")
+		assert.ErrorIs(t, err, domain.ErrShipmentNotFound)
+		assert.Nil(t, result)
+	})
+
+	t.Run("ForbiddenAccess", func(t *testing.T) {
+		mockRepo.EXPECT().GetOrderByResiID("AWB-001").Return(
+			&OrderModel{ResiID: "AWB-001", UserID: "user-1"}, nil,
+		)
+
+		result, err := service.GetOrderTracking(ctx, "user-99", "AWB-001")
+		assert.ErrorIs(t, err, domain.ErrForbidden)
+		assert.Nil(t, result)
+	})
+
+	t.Run("TrackingUnavailable_ReturnsFallback", func(t *testing.T) {
+		mockRepo.EXPECT().GetOrderByResiID("AWB-002").Return(
+			&OrderModel{ResiID: "AWB-002", UserID: "user-1", Status: domain.StatusCreated}, nil,
+		)
+		// GetCurrentStatus fails → fallback to OrderModel.Status
+		mockTracking.EXPECT().GetCurrentStatus(ctx, "AWB-002").Return(domain.TrackingStatus(""), errors.New("tracking down"))
+		// GetTrackingHistory fails → empty events
+		mockTracking.EXPECT().GetTrackingHistory(ctx, "AWB-002").Return(nil, errors.New("tracking down"))
+
+		result, err := service.GetOrderTracking(ctx, "user-1", "AWB-002")
+		// Must succeed (no error) — graceful degradation
+		assert.NoError(t, err)
+		assert.NotNil(t, result)
+		assert.Equal(t, domain.StatusCreated, result.CurrentStatus) // fallback to OrderModel.Status
+		assert.Empty(t, result.Events)                              // empty slice, not nil
 	})
 }

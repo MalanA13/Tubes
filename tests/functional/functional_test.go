@@ -7,8 +7,9 @@
 // network ke microservice lain, tapi tetap menguji alur service + repository.
 //
 // Flow utama yang ditest:
-//   CREATED → ScanIn(IN_HUB) → ScanOut(IN_TRANSIT)
-//           → AssignCourier(OUT_DELIVERY) → UpdateDeliveryStatus(DELIVERED)
+//
+//	CREATED → ScanIn(IN_HUB) → ScanOut(IN_TRANSIT)
+//	        → AssignCourier(OUT_DELIVERY) → UpdateDeliveryStatus(DELIVERED)
 package functional
 
 import (
@@ -18,10 +19,10 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/tubes-cc/logistics/internal/courier"
 	"github.com/tubes-cc/logistics/domain"
-	"github.com/tubes-cc/logistics/internal/hub"
 	sqliterepo "github.com/tubes-cc/logistics/infrastructure/sqlite"
+	"github.com/tubes-cc/logistics/internal/courier"
+	"github.com/tubes-cc/logistics/internal/hub"
 )
 
 // ================================================================
@@ -32,15 +33,23 @@ import (
 // stubTrackingClient menyimpan semua event yang diterima ke slice in-memory.
 // Digunakan untuk memverifikasi bahwa event dikirim dengan benar.
 type stubTrackingClient struct {
-    repo   *sqliterepo.ShipmentRepository
-    events []*domain.TrackingEvent
+	repo   *sqliterepo.ShipmentRepository
+	events []*domain.TrackingEvent
 }
 
 func (s *stubTrackingClient) AddTrackingEvent(ctx context.Context, e *domain.TrackingEvent) error {
-    s.events = append(s.events, e)
+	s.events = append(s.events, e)
 
-    // 🔥 INI KUNCI NYA
-    return s.repo.AddTrackingEvent(ctx, e)
+	// 🔥 INI KUNCI NYA
+	return s.repo.AddTrackingEvent(ctx, e)
+}
+
+func (s *stubTrackingClient) GetCurrentStatus(_ context.Context, _ string) (domain.TrackingStatus, error) {
+	return domain.StatusCreated, nil
+}
+
+func (s *stubTrackingClient) GetTrackingHistory(_ context.Context, _ string) ([]domain.TrackingEvent, error) {
+	return []domain.TrackingEvent{}, nil
 }
 
 // stubOrderClient selalu menganggap resi valid (return nil).
@@ -90,8 +99,8 @@ func setupTest(t *testing.T) *testEnv {
 
 	trackingStub := &stubTrackingClient{
 		repo: repo,
-	}	
-	
+	}
+
 	orderStub := &stubOrderClient{}
 
 	return &testEnv{
@@ -107,7 +116,8 @@ func setupTest(t *testing.T) *testEnv {
 // ================================================================
 
 // TestFullDeliveryFlow_HappyPath menguji alur pengiriman lengkap dan sukses:
-//   CREATED → IN_HUB → IN_TRANSIT → OUT_DELIVERY → DELIVERED
+//
+//	CREATED → IN_HUB → IN_TRANSIT → OUT_DELIVERY → DELIVERED
 func TestFullDeliveryFlow_HappyPath(t *testing.T) {
 	env := setupTest(t)
 	ctx := context.Background()
@@ -175,7 +185,8 @@ func TestFullDeliveryFlow_HappyPath(t *testing.T) {
 }
 
 // TestFailedDeliveryFlow menguji alur pengiriman yang gagal:
-//   CREATED → IN_HUB → IN_TRANSIT → OUT_DELIVERY → FAILED
+//
+//	CREATED → IN_HUB → IN_TRANSIT → OUT_DELIVERY → FAILED
 func TestFailedDeliveryFlow(t *testing.T) {
 	env := setupTest(t)
 	ctx := context.Background()
@@ -195,7 +206,8 @@ func TestFailedDeliveryFlow(t *testing.T) {
 }
 
 // TestMultiHubTransit menguji paket melewati beberapa hub:
-//   ScanIn(HUB-A) → ScanOut(HUB-A) → ScanIn(HUB-B) → ScanOut(HUB-B) → ...
+//
+//	ScanIn(HUB-A) → ScanOut(HUB-A) → ScanIn(HUB-B) → ScanOut(HUB-B) → ...
 func TestMultiHubTransit(t *testing.T) {
 	env := setupTest(t)
 	ctx := context.Background()

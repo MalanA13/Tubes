@@ -2,6 +2,7 @@ package handler
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 
 	"github.com/gorilla/mux"
@@ -58,5 +59,32 @@ func HandleGetTrackingHTTP(service tracking.TrackingService) http.HandlerFunc {
 		}
 
 		response.OK(w, events)
+	}
+}
+
+// HandleGetCurrentStatusHTTP returns the current shipment status snapshot.
+func HandleGetCurrentStatusHTTP(service tracking.TrackingService) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		vars := mux.Vars(r)
+		resiID := vars["resiID"]
+		if resiID == "" {
+			response.BadRequest(w, "resiID is required")
+			return
+		}
+
+		status, err := service.GetCurrentStatus(resiID)
+		if err != nil {
+			if errors.Is(err, domain.ErrShipmentNotFound) {
+				response.NotFound(w, "shipment status not found")
+				return
+			}
+			response.InternalServerError(w, err.Error())
+			return
+		}
+
+		response.OK(w, map[string]string{
+			"resi_id": resiID,
+			"status":  string(status),
+		})
 	}
 }

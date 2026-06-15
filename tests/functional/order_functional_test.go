@@ -28,6 +28,14 @@ func (s *simpleStubTrackingClient) AddTrackingEvent(ctx context.Context, e *doma
 	return nil
 }
 
+func (s *simpleStubTrackingClient) GetCurrentStatus(_ context.Context, _ string) (domain.TrackingStatus, error) {
+	return domain.StatusCreated, nil
+}
+
+func (s *simpleStubTrackingClient) GetTrackingHistory(_ context.Context, _ string) ([]domain.TrackingEvent, error) {
+	return []domain.TrackingEvent{}, nil
+}
+
 func TestOrderFunctional(t *testing.T) {
 	db, err := gorm.Open(sqlite.Open("file::memory:?cache=shared"), &gorm.Config{})
 	require.NoError(t, err)

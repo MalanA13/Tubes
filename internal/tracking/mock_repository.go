@@ -72,3 +72,18 @@ func (mr *MockTrackingRepositoryMockRecorder) UpdateShipmentStatus(resiID, statu
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateShipmentStatus", reflect.TypeOf((*MockTrackingRepository)(nil).UpdateShipmentStatus), resiID, status)
 }
+
+// GetCurrentStatus mocks base method.
+func (m *MockTrackingRepository) GetCurrentStatus(resiID string) (domain.TrackingStatus, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetCurrentStatus", resiID)
+	ret0, _ := ret[0].(domain.TrackingStatus)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetCurrentStatus indicates an expected call of GetCurrentStatus.
+func (mr *MockTrackingRepositoryMockRecorder) GetCurrentStatus(resiID interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetCurrentStatus", reflect.TypeOf((*MockTrackingRepository)(nil).GetCurrentStatus), resiID)
+}

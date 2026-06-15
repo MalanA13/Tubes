@@ -60,6 +60,7 @@ func main() {
 	// Daftarkan Route ke handler kelompok
 	r.HandleFunc("/track", handler.HandleSendTrackingHTTP(*trackingService)).Methods("POST")
 	r.HandleFunc("/events", handler.HandleSendTrackingHTTP(*trackingService)).Methods("POST")
+	r.HandleFunc("/tracking/{resiID}/status", handler.HandleGetCurrentStatusHTTP(*trackingService)).Methods("GET")
 	r.HandleFunc("/tracking/{resiID}", handler.HandleGetTrackingHTTP(*trackingService)).Methods("GET")
 
 	// Health check endpoint

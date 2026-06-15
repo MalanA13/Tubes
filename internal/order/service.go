@@ -17,6 +17,22 @@ type OrderService struct {
 	pricingClient  client.PricingClient
 }
 
+// TrackingEventSummary is the customer-facing shape of a single tracking event.
+// Drops internal fields (id, resi_id) and renames created_at to timestamp.
+type TrackingEventSummary struct {
+	Status    domain.TrackingStatus `json:"status"`
+	Location  string                `json:"location"`
+	Note      string                `json:"note"`
+	Timestamp time.Time             `json:"timestamp"`
+}
+
+// OrderTracking is the combined tracking response returned to the customer.
+type OrderTracking struct {
+	ResiID        string                 `json:"resi_id"`
+	CurrentStatus domain.TrackingStatus  `json:"current_status"`
+	Events        []TrackingEventSummary `json:"events"`
+}
+
 // NewService creates a new OrderService.
 func NewService(repo OrderRepository, trackingClient client.TrackingClient, pricingClient client.PricingClient) *OrderService {
 	return &OrderService{
@@ -112,4 +128,55 @@ func (s *OrderService) GetOrderByResiID(userID, resiID string) (*OrderModel, err
 // ListOrdersByUserID returns all orders belonging to a user.
 func (s *OrderService) ListOrdersByUserID(userID string) ([]*OrderModel, error) {
 	return s.repo.ListOrdersByUserID(userID)
+}
+
+// GetCurrentStatus fetches the current shipment status from Tracking Service.
+// On any error (network, timeout, not found), returns the provided fallback status.
+// This method never returns an error — the caller always gets a usable status.
+func (s *OrderService) GetCurrentStatus(ctx context.Context, resiID string, fallback domain.TrackingStatus) domain.TrackingStatus {
+	status, err := s.trackingClient.GetCurrentStatus(ctx, resiID)
+	if err != nil {
+		return fallback
+	}
+	return status
+}
+
+// GetOrderTracking retrieves the tracking timeline for an order.
+// Validates that userID owns the order before returning data.
+// Returns domain.ErrShipmentNotFound if no order exists for resiID.
+// Returns domain.ErrForbidden if the order belongs to a different user.
+// Never fails due to Tracking Service unavailability:
+// current_status falls back to OrderModel.Status, events falls back to empty slice.
+func (s *OrderService) GetOrderTracking(ctx context.Context, userID, resiID string) (*OrderTracking, error) {
+	// 1. Verify ownership — reuse existing method
+	orderModel, err := s.GetOrderByResiID(userID, resiID)
+	if err != nil {
+		return nil, err // propagate ErrShipmentNotFound or ErrForbidden as-is
+	}
+
+	// 2. Current status from Tracking (with graceful fallback)
+	currentStatus := s.GetCurrentStatus(ctx, resiID, orderModel.Status)
+
+	// 3. Event history from Tracking (degrade gracefully on error)
+	rawEvents, trackingErr := s.trackingClient.GetTrackingHistory(ctx, resiID)
+	if trackingErr != nil {
+		rawEvents = []domain.TrackingEvent{}
+	}
+
+	// 4. Map to customer-facing shape — drop id and resi_id
+	events := make([]TrackingEventSummary, 0, len(rawEvents))
+	for _, e := range rawEvents {
+		events = append(events, TrackingEventSummary{
+			Status:    e.Status,
+			Location:  e.Location,
+			Note:      e.Note,
+			Timestamp: e.CreatedAt,
+		})
+	}
+
+	return &OrderTracking{
+		ResiID:        resiID,
+		CurrentStatus: currentStatus,
+		Events:        events,
+	}, nil
 }

@@ -21,6 +21,14 @@ type TrackingClient interface {
 	// AddTrackingEvent mengirim event tracking baru ke Tracking Service.
 	// Dipanggil setiap kali status paket berubah.
 	AddTrackingEvent(ctx context.Context, event *domain.TrackingEvent) error
+
+	// GetCurrentStatus retrieves the current shipment status from Tracking Service.
+	// Returns domain.StatusCreated if no snapshot exists (fresh resi).
+	GetCurrentStatus(ctx context.Context, resiID string) (domain.TrackingStatus, error)
+
+	// GetTrackingHistory retrieves all tracking events for a resi from Tracking Service.
+	// Returns empty slice (not nil) if no events exist (404 from Tracking).
+	GetTrackingHistory(ctx context.Context, resiID string) ([]domain.TrackingEvent, error)
 }
 
 // PricingClient mendefinisikan kontrak untuk meminta perhitungan harga

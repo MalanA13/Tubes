@@ -1,7 +1,9 @@
 package tracking
 
 import (
+	"errors"
 	"time"
+
 	"github.com/tubes-cc/logistics/domain"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
@@ -9,8 +11,8 @@ import (
 
 // TrackingEventModel is the DB schema for tracking events.
 type TrackingEventModel struct {
-	ID        string                `gorm:"primaryKey"`
-	ResiID    string                `gorm:"index"`
+	ID        string `gorm:"primaryKey"`
+	ResiID    string `gorm:"index"`
 	Status    domain.TrackingStatus
 	Location  string
 	Note      string
@@ -19,7 +21,7 @@ type TrackingEventModel struct {
 
 // ShipmentModel is the DB schema for shipments.
 type ShipmentModel struct {
-	ResiID    string                `gorm:"primaryKey"`
+	ResiID    string `gorm:"primaryKey"`
 	Status    domain.TrackingStatus
 	HubID     string
 	CourierID string
@@ -32,6 +34,7 @@ type TrackingRepository interface {
 	SaveEvent(event domain.TrackingEvent) error
 	GetTrackingHistory(resiID string) ([]domain.TrackingEvent, error)
 	UpdateShipmentStatus(resiID string, status domain.TrackingStatus) error
+	GetCurrentStatus(resiID string) (domain.TrackingStatus, error)
 }
 
 // trackingRepository is the implementation of TrackingRepository using GORM
@@ -88,4 +91,18 @@ func (r *trackingRepository) UpdateShipmentStatus(resiID string, status domain.T
 		Columns:   []clause.Column{{Name: "resi_id"}},
 		DoUpdates: clause.AssignmentColumns([]string{"status", "updated_at"}),
 	}).Create(&shipment).Error
+}
+
+// GetCurrentStatus returns the current shipment status from the snapshot table.
+// Returns domain.ErrShipmentNotFound if no row exists for the given resiID.
+func (r *trackingRepository) GetCurrentStatus(resiID string) (domain.TrackingStatus, error) {
+	var shipment ShipmentModel
+	err := r.db.Where("resi_id = ?", resiID).First(&shipment).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return "", domain.ErrShipmentNotFound
+		}
+		return "", err
+	}
+	return shipment.Status, nil
 }

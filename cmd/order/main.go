@@ -93,6 +93,11 @@ func main() {
 		response.OK(w, map[string]string{"status": "valid"})
 	}).Methods("GET")
 
+	// Authenticated: get shipment tracking timeline for owned order
+	router.Handle("/orders/{resiID}/tracking",
+		authMiddleware.Authenticate(handler.HandleGetOrderTrackingHTTP(*orderService)),
+	).Methods("GET")
+
 	// Authenticated: get single order by resiID
 	router.Handle("/orders/{resiID}",
 		authMiddleware.Authenticate(handler.HandleGetOrderHTTP(*orderService)),

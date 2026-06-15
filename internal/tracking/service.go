@@ -2,9 +2,10 @@ package tracking
 
 import (
 	"errors"
-	"github.com/tubes-cc/logistics/domain"
 	"time"
+
 	"github.com/google/uuid"
+	"github.com/tubes-cc/logistics/domain"
 )
 
 // TrackingService handles business logic for package tracking
@@ -46,4 +47,13 @@ func (s *TrackingService) GetHistory(resiID string) ([]domain.TrackingEvent, err
 		return nil, errors.New("resi_id cannot be empty")
 	}
 	return s.repo.GetTrackingHistory(resiID)
+}
+
+// GetCurrentStatus returns the current shipment status from the tracking snapshot.
+// Returns domain.ErrShipmentNotFound if no snapshot exists for the resi.
+func (s *TrackingService) GetCurrentStatus(resiID string) (domain.TrackingStatus, error) {
+	if resiID == "" {
+		return "", errors.New("resi_id cannot be empty")
+	}
+	return s.repo.GetCurrentStatus(resiID)
 }

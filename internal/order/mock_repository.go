@@ -128,3 +128,27 @@ func (mr *MockTrackingClientMockRecorder) AddTrackingEvent(ctx, event interface{
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddTrackingEvent", reflect.TypeOf((*MockTrackingClient)(nil).AddTrackingEvent), ctx, event)
 }
+
+func (m *MockTrackingClient) GetCurrentStatus(ctx context.Context, resiID string) (domain.TrackingStatus, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetCurrentStatus", ctx, resiID)
+	ret0, _ := ret[0].(domain.TrackingStatus)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+func (mr *MockTrackingClientMockRecorder) GetCurrentStatus(ctx, resiID interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetCurrentStatus", reflect.TypeOf((*MockTrackingClient)(nil).GetCurrentStatus), ctx, resiID)
+}
+
+func (m *MockTrackingClient) GetTrackingHistory(ctx context.Context, resiID string) ([]domain.TrackingEvent, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetTrackingHistory", ctx, resiID)
+	ret0, _ := ret[0].([]domain.TrackingEvent)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+func (mr *MockTrackingClientMockRecorder) GetTrackingHistory(ctx, resiID interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetTrackingHistory", reflect.TypeOf((*MockTrackingClient)(nil).GetTrackingHistory), ctx, resiID)
+}
