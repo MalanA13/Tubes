@@ -4,6 +4,7 @@ import (
 	"time"
 	"github.com/tubes-cc/logistics/domain"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 // TrackingEventModel is the DB schema for tracking events.
@@ -76,7 +77,15 @@ func (r *trackingRepository) GetTrackingHistory(resiID string) ([]domain.Trackin
 	return events, nil
 }
 
-// UpdateShipmentStatus updates the latest status of a shipment.
+// UpdateShipmentStatus updates the latest status of a shipment using upsert to guarantee existence.
 func (r *trackingRepository) UpdateShipmentStatus(resiID string, status domain.TrackingStatus) error {
-	return r.db.Model(&ShipmentModel{}).Where("resi_id = ?", resiID).Updates(map[string]interface{}{"status": status, "updated_at": time.Now()}).Error
+	shipment := ShipmentModel{
+		ResiID:    resiID,
+		Status:    status,
+		UpdatedAt: time.Now(),
+	}
+	return r.db.Clauses(clause.OnConflict{
+		Columns:   []clause.Column{{Name: "resi_id"}},
+		DoUpdates: clause.AssignmentColumns([]string{"status", "updated_at"}),
+	}).Create(&shipment).Error
 }

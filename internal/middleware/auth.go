@@ -11,16 +11,11 @@ import (
 
 	"github.com/tubes-cc/logistics/client"
 	"github.com/tubes-cc/logistics/domain"
+	"github.com/tubes-cc/logistics/internal/contextutil"
 	"github.com/tubes-cc/logistics/internal/response"
 )
 
-// contextKey adalah tipe untuk key dalam context agar menghindari collision.
-type contextKey string
 
-const (
-	// ContextKeyAuthClaims adalah key untuk menyimpan AuthClaims di context.
-	ContextKeyAuthClaims contextKey = "auth_claims"
-)
 
 // AuthMiddleware menyediakan middleware autentikasi berbasis JWT.
 // Menggunakan AuthClient interface (bukan implementasi konkret).
@@ -71,7 +66,7 @@ func (m *AuthMiddleware) Authenticate(next http.HandlerFunc) http.HandlerFunc {
 		}
 
 		// Simpan claims di context untuk digunakan handler
-		ctx := context.WithValue(r.Context(), ContextKeyAuthClaims, claims)
+		ctx := context.WithValue(r.Context(), contextutil.AuthClaimsKey, claims)
 		next(w, r.WithContext(ctx))
 	}
 }
@@ -84,7 +79,7 @@ func (m *AuthMiddleware) Authenticate(next http.HandlerFunc) http.HandlerFunc {
 //	mw.Authenticate(mw.RequireRole(domain.RoleAdmin, adminHandler))
 func (m *AuthMiddleware) RequireRole(role domain.UserRole, next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		claims, ok := r.Context().Value(ContextKeyAuthClaims).(*domain.AuthClaims)
+		claims, ok := r.Context().Value(contextutil.AuthClaimsKey).(*domain.AuthClaims)
 		if !ok || claims == nil {
 			response.Unauthorized(w, "claims tidak ditemukan di context")
 			return
@@ -102,6 +97,6 @@ func (m *AuthMiddleware) RequireRole(role domain.UserRole, next http.HandlerFunc
 // GetAuthClaims mengambil AuthClaims dari context request.
 // Mengembalikan nil jika tidak ada (belum melewati middleware Authenticate).
 func GetAuthClaims(r *http.Request) *domain.AuthClaims {
-	claims, _ := r.Context().Value(ContextKeyAuthClaims).(*domain.AuthClaims)
+	claims, _ := r.Context().Value(contextutil.AuthClaimsKey).(*domain.AuthClaims)
 	return claims
 }

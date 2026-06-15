@@ -136,3 +136,47 @@ func TestMiddlewareChain_DoesNotAlterAPIResponse(t *testing.T) {
 		t.Errorf("Expected RequestID header to be set by chain")
 	}
 }
+
+func TestRecoveryMiddleware(t *testing.T) {
+	req := httptest.NewRequest("GET", "/", nil)
+	rr := httptest.NewRecorder()
+
+	panicHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		panic("something went wrong")
+	})
+
+	handler := middleware.RecoveryMiddleware(panicHandler)
+	
+	// Should not crash the runner
+	defer func() {
+		if r := recover(); r != nil {
+			t.Errorf("RecoveryMiddleware failed to catch panic, panic bubbled up: %v", r)
+		}
+	}()
+
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusInternalServerError {
+		t.Errorf("Expected status code %d, got %d", http.StatusInternalServerError, rr.Code)
+	}
+
+	var resp struct {
+		Success bool `json:"success"`
+		Error   struct {
+			Code    string `json:"code"`
+			Message string `json:"message"`
+		} `json:"error"`
+	}
+
+	if err := json.Unmarshal(rr.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("Failed to parse response body: %v", err)
+	}
+
+	if resp.Success {
+		t.Errorf("Expected success to be false")
+	}
+
+	if resp.Error.Code != "INTERNAL_SERVER_ERROR" {
+		t.Errorf("Expected error code INTERNAL_SERVER_ERROR, got %s", resp.Error.Code)
+	}
+}

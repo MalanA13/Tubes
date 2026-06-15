@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"errors"
-	"fmt"
 	"net/http"
 	"os"
 	"os/signal"
@@ -13,9 +12,9 @@ import (
 	"github.com/gorilla/mux" // Pastikan library router sesuai yang kelompokmu pakai
 	models "github.com/tubes-cc/logistics/domain"
 	"github.com/tubes-cc/logistics/internal/auth"
-	"github.com/tubes-cc/logistics/internal/logger"
 	"github.com/tubes-cc/logistics/internal/config"
 	"github.com/tubes-cc/logistics/internal/handler"
+	"github.com/tubes-cc/logistics/internal/logger"
 	"github.com/tubes-cc/logistics/internal/middleware"
 
 	"go.uber.org/zap"
@@ -40,6 +39,12 @@ func main() {
 		zap.L().Fatal("Failed to connect to auth database", zap.Error(err))
 	}
 
+	sqlDB, err := db.DB()
+	if err != nil {
+		zap.L().Fatal("Failed to get raw database connection", zap.Error(err))
+	}
+	defer sqlDB.Close()
+
 	// Auto-migrate User model
 	if err := db.AutoMigrate(&models.User{}); err != nil {
 		zap.L().Fatal("Failed to auto-migrate User table", zap.Error(err))
@@ -61,6 +66,11 @@ func main() {
 	// Health check endpoint
 	r.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
+		if err := sqlDB.Ping(); err != nil {
+			w.WriteHeader(http.StatusServiceUnavailable)
+			w.Write([]byte(`{"status":"DOWN","service":"auth","reason":"database ping failed"}`))
+			return
+		}
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte(`{"status":"UP","service":"auth"}`))
 	}).Methods("GET")
@@ -69,7 +79,7 @@ func main() {
 
 	srv := &http.Server{
 		Addr:         port,
-		Handler:      middleware.CORS(middleware.RequestIDMiddleware(middleware.LoggingMiddleware(r))),
+		Handler:      middleware.CORS(middleware.RequestIDMiddleware(middleware.LoggingMiddleware(middleware.RecoveryMiddleware(r)))),
 		ReadTimeout:  10 * time.Second,
 		WriteTimeout: 10 * time.Second,
 		IdleTimeout:  60 * time.Second,
@@ -79,9 +89,9 @@ func main() {
 	defer stop()
 
 	go func() {
-		zap.L().Info(fmt.Sprintf("Auth Service is running on port %s", port))
+		zap.L().Info("Auth Service is running", zap.String("port", port))
 		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			zap.L().Error("Failed to start server", zap.Error(err))
+			zap.L().Fatal("Failed to start server", zap.Error(err))
 		}
 	}()
 

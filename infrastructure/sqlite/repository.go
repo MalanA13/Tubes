@@ -5,33 +5,55 @@ package sqlite
 
 import (
 	"context"
-	"database/sql"
+	"errors"
 	"fmt"
 	"time"
 
 	"github.com/tubes-cc/logistics/domain"
-
-	// Driver SQLite — hanya diperlukan side-effect (registrasi driver).
-	_ "github.com/mattn/go-sqlite3"
+	"gorm.io/driver/sqlite"
+	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
+// ShipmentModel merepresentasikan tabel shipments di database.
+type ShipmentModel struct {
+	ResiID    string                `gorm:"primaryKey;column:resi_id"`
+	Status    domain.TrackingStatus `gorm:"column:status;not null;default:'CREATED'"`
+	HubID     string                `gorm:"column:hub_id;not null;default:''"`
+	CourierID string                `gorm:"column:courier_id;not null;default:''"`
+	ProofURL  string                `gorm:"column:proof_url;not null;default:''"`
+	UpdatedAt time.Time             `gorm:"column:updated_at;not null"`
+}
+
+// TableName menentukan nama tabel shipments secara eksplisit.
+func (ShipmentModel) TableName() string {
+	return "shipments"
+}
+
+// TrackingEventModel merepresentasikan tabel tracking_events di database.
+type TrackingEventModel struct {
+	ID        string                `gorm:"primaryKey;column:id"`
+	ResiID    string                `gorm:"column:resi_id;not null"`
+	Status    domain.TrackingStatus `gorm:"column:status;not null"`
+	Location  string                `gorm:"column:location;not null;default:''"`
+	Note      string                `gorm:"column:note;not null;default:''"`
+	CreatedAt time.Time             `gorm:"column:created_at;not null"`
+}
+
+// TableName menentukan nama tabel tracking_events secara eksplisit.
+func (TrackingEventModel) TableName() string {
+	return "tracking_events"
+}
+
 // ShipmentRepository mengimplementasikan hub.Repository dan courier.Repository
-// menggunakan SQLite sebagai penyimpanan data.
+// menggunakan SQLite sebagai penyimpanan data dengan GORM.
 type ShipmentRepository struct {
-	db *sql.DB
+	db *gorm.DB
 }
 
 // NewShipmentRepository membuat instance repository baru dan menjalankan migrasi.
-// Parameter db adalah koneksi SQLite yang sudah terbuka.
-//
-// Contoh untuk in-memory (test):
-//   db, _ := sql.Open("sqlite3", ":memory:")
-//   repo, _ := sqlite.NewShipmentRepository(db)
-//
-// Contoh untuk file (production):
-//   db, _ := sql.Open("sqlite3", "./logistics.db")
-//   repo, _ := sqlite.NewShipmentRepository(db)
-func NewShipmentRepository(db *sql.DB) (*ShipmentRepository, error) {
+// Parameter db adalah koneksi GORM SQLite yang sudah terbuka.
+func NewShipmentRepository(db *gorm.DB) (*ShipmentRepository, error) {
 	repo := &ShipmentRepository{db: db}
 	if err := repo.migrate(); err != nil {
 		return nil, fmt.Errorf("gagal migrasi database: %w", err)
@@ -39,46 +61,59 @@ func NewShipmentRepository(db *sql.DB) (*ShipmentRepository, error) {
 	return repo, nil
 }
 
-// migrate membuat semua tabel yang diperlukan jika belum ada.
+// migrate membuat semua tabel yang diperlukan jika belum ada menggunakan GORM AutoMigrate.
 func (r *ShipmentRepository) migrate() error {
-	queries := []string{
-		// Tabel shipments: data utama pengiriman
-		`CREATE TABLE IF NOT EXISTS shipments (
-			resi_id    TEXT PRIMARY KEY,
-			status     TEXT NOT NULL DEFAULT 'CREATED',
-			hub_id     TEXT NOT NULL DEFAULT '',
-			courier_id TEXT NOT NULL DEFAULT '',
-			proof_url  TEXT NOT NULL DEFAULT '',
-			updated_at TEXT NOT NULL DEFAULT ''
-		)`,
-		// Tabel tracking_events: history perubahan status
-		// ID berupa UUID sehingga PRIMARY KEY tidak akan collision
-		`CREATE TABLE IF NOT EXISTS tracking_events (
-			id         TEXT PRIMARY KEY,
-			resi_id    TEXT NOT NULL,
-			status     TEXT NOT NULL,
-			location   TEXT NOT NULL DEFAULT '',
-			note       TEXT NOT NULL DEFAULT '',
-			created_at TEXT NOT NULL DEFAULT ''
-		)`,
-	}
-
-	for _, q := range queries {
-		if _, err := r.db.Exec(q); err != nil {
-			return fmt.Errorf("gagal eksekusi migrasi: %w", err)
-		}
+	if err := r.db.AutoMigrate(&ShipmentModel{}, &TrackingEventModel{}); err != nil {
+		return err
 	}
 	return nil
 }
 
-// CreateShipmentIfNotExists membuat record shipment baru jika resiID belum ada.
-// Jika sudah ada, operasi ini diabaikan (idempotent).
-// Dipanggil pada awal ScanIn dan AssignCourier untuk memastikan record tersedia.
-func (r *ShipmentRepository) CreateShipmentIfNotExists(ctx context.Context, resiID string) error {
-	query := `INSERT OR IGNORE INTO shipments (resi_id, status, hub_id, courier_id, proof_url, updated_at)
-	          VALUES (?, 'CREATED', '', '', '', ?)`
+// toDomainShipment mengubah ShipmentModel menjadi domain.Shipment.
+func toDomainShipment(m *ShipmentModel) *domain.Shipment {
+	if m == nil {
+		return nil
+	}
+	return &domain.Shipment{
+		ResiID:    m.ResiID,
+		Status:    m.Status,
+		HubID:     m.HubID,
+		CourierID: m.CourierID,
+		ProofURL:  m.ProofURL,
+		UpdatedAt: m.UpdatedAt,
+	}
+}
 
-	_, err := r.db.ExecContext(ctx, query, resiID, time.Now().Format(time.RFC3339Nano))
+// toDomainTrackingEvent mengubah TrackingEventModel menjadi domain.TrackingEvent.
+func toDomainTrackingEvent(m *TrackingEventModel) *domain.TrackingEvent {
+	if m == nil {
+		return nil
+	}
+	return &domain.TrackingEvent{
+		ID:        m.ID,
+		ResiID:    m.ResiID,
+		Status:    m.Status,
+		Location:  m.Location,
+		Note:      m.Note,
+		CreatedAt: m.CreatedAt,
+	}
+}
+
+// CreateShipmentIfNotExists membuat record shipment baru jika resiID belum ada.
+// Jika sudah ada, operasi ini diabaikan (idempotent) menggunakan clauses on conflict do nothing.
+func (r *ShipmentRepository) CreateShipmentIfNotExists(ctx context.Context, resiID string) error {
+	m := &ShipmentModel{
+		ResiID:    resiID,
+		Status:    domain.StatusCreated,
+		HubID:     "",
+		CourierID: "",
+		ProofURL:  "",
+		UpdatedAt: time.Now(),
+	}
+
+	err := r.db.WithContext(ctx).
+		Clauses(clause.OnConflict{DoNothing: true}).
+		Create(m).Error
 	if err != nil {
 		return fmt.Errorf("gagal create shipment: %w", err)
 	}
@@ -88,67 +123,50 @@ func (r *ShipmentRepository) CreateShipmentIfNotExists(ctx context.Context, resi
 // GetShipment mengambil data shipment berdasarkan resiID.
 // Mengembalikan domain.ErrShipmentNotFound jika tidak ada.
 func (r *ShipmentRepository) GetShipment(ctx context.Context, resiID string) (*domain.Shipment, error) {
-	query := `SELECT resi_id, status, hub_id, courier_id, proof_url, updated_at
-	          FROM shipments WHERE resi_id = ?`
-
-	var s domain.Shipment
-	var updatedAtStr string
-
-	err := r.db.QueryRowContext(ctx, query, resiID).Scan(
-		&s.ResiID, &s.Status, &s.HubID, &s.CourierID, &s.ProofURL, &updatedAtStr,
-	)
-	if err == sql.ErrNoRows {
-		return nil, domain.ErrShipmentNotFound
-	}
+	var m ShipmentModel
+	err := r.db.WithContext(ctx).Where("resi_id = ?", resiID).First(&m).Error
 	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, domain.ErrShipmentNotFound
+		}
 		return nil, fmt.Errorf("gagal query shipment: %w", err)
 	}
-
-	// Parse waktu — toleran terhadap berbagai format SQLite
-	s.UpdatedAt = parseTime(updatedAtStr)
-	return &s, nil
+	return toDomainShipment(&m), nil
 }
 
 // UpdateShipment menyimpan perubahan data shipment ke database.
 // Mengembalikan domain.ErrShipmentNotFound jika resiID tidak ada.
 func (r *ShipmentRepository) UpdateShipment(ctx context.Context, shipment *domain.Shipment) error {
-	query := `UPDATE shipments
-	          SET status = ?, hub_id = ?, courier_id = ?, proof_url = ?, updated_at = ?
-	          WHERE resi_id = ?`
-
-	result, err := r.db.ExecContext(ctx, query,
-		string(shipment.Status),
-		shipment.HubID,
-		shipment.CourierID,
-		shipment.ProofURL,
-		shipment.UpdatedAt.Format(time.RFC3339Nano),
-		shipment.ResiID,
-	)
-	if err != nil {
-		return fmt.Errorf("gagal update shipment: %w", err)
+	updates := map[string]interface{}{
+		"status":     string(shipment.Status),
+		"hub_id":     shipment.HubID,
+		"courier_id": shipment.CourierID,
+		"proof_url":  shipment.ProofURL,
+		"updated_at": shipment.UpdatedAt,
 	}
 
-	rows, _ := result.RowsAffected()
-	if rows == 0 {
+	result := r.db.WithContext(ctx).Model(&ShipmentModel{}).Where("resi_id = ?", shipment.ResiID).Updates(updates)
+	if result.Error != nil {
+		return fmt.Errorf("gagal update shipment: %w", result.Error)
+	}
+	if result.RowsAffected == 0 {
 		return domain.ErrShipmentNotFound
 	}
 	return nil
 }
 
 // AddTrackingEvent menyimpan tracking event ke database.
-// Event ID harus berupa UUID agar tidak terjadi UNIQUE constraint violation.
 func (r *ShipmentRepository) AddTrackingEvent(ctx context.Context, event *domain.TrackingEvent) error {
-	query := `INSERT INTO tracking_events (id, resi_id, status, location, note, created_at)
-	          VALUES (?, ?, ?, ?, ?, ?)`
+	m := &TrackingEventModel{
+		ID:        event.ID,
+		ResiID:    event.ResiID,
+		Status:    event.Status,
+		Location:  event.Location,
+		Note:      event.Note,
+		CreatedAt: event.CreatedAt,
+	}
 
-	_, err := r.db.ExecContext(ctx, query,
-		event.ID,
-		event.ResiID,
-		string(event.Status),
-		event.Location,
-		event.Note,
-		event.CreatedAt.Format(time.RFC3339Nano),
-	)
+	err := r.db.WithContext(ctx).Create(m).Error
 	if err != nil {
 		return fmt.Errorf("gagal insert tracking event: %w", err)
 	}
@@ -157,58 +175,38 @@ func (r *ShipmentRepository) AddTrackingEvent(ctx context.Context, event *domain
 
 // GetTrackingEvents mengambil semua tracking event untuk sebuah resi,
 // diurutkan berdasarkan waktu (ascending = kronologis).
-// Digunakan oleh functional test untuk verifikasi history.
 func (r *ShipmentRepository) GetTrackingEvents(ctx context.Context, resiID string) ([]*domain.TrackingEvent, error) {
-	query := `SELECT id, resi_id, status, location, note, created_at
-	          FROM tracking_events
-	          WHERE resi_id = ?
-	          ORDER BY created_at ASC`
-
-	rows, err := r.db.QueryContext(ctx, query, resiID)
+	var models []TrackingEventModel
+	err := r.db.WithContext(ctx).
+		Where("resi_id = ?", resiID).
+		Order("created_at ASC").
+		Find(&models).Error
 	if err != nil {
 		return nil, fmt.Errorf("gagal query tracking events: %w", err)
 	}
-	defer rows.Close()
 
-	var events []*domain.TrackingEvent
-	for rows.Next() {
-		var e domain.TrackingEvent
-		var createdAtStr string
-
-		if err := rows.Scan(&e.ID, &e.ResiID, &e.Status, &e.Location, &e.Note, &createdAtStr); err != nil {
-			return nil, fmt.Errorf("gagal scan event: %w", err)
-		}
-		e.CreatedAt = parseTime(createdAtStr)
-		events = append(events, &e)
+	events := make([]*domain.TrackingEvent, len(models))
+	for i, m := range models {
+		events[i] = toDomainTrackingEvent(&m)
 	}
-	return events, rows.Err()
+	return events, nil
 }
 
-// Open membuka koneksi SQLite. Gunakan ":memory:" untuk in-memory database.
-func Open(dsn string) (*sql.DB, error) {
-	db, err := sql.Open("sqlite3", dsn)
+// Open membuka koneksi SQLite menggunakan GORM. Gunakan ":memory:" untuk in-memory database.
+func Open(dsn string) (*gorm.DB, error) {
+	db, err := gorm.Open(sqlite.Open(dsn), &gorm.Config{})
 	if err != nil {
 		return nil, fmt.Errorf("gagal membuka SQLite: %w", err)
 	}
-	if err := db.Ping(); err != nil {
+	
+	// Verifikasi koneksi dengan ping underlying DB
+	sqlDB, err := db.DB()
+	if err != nil {
+		return nil, fmt.Errorf("gagal mendapatkan sql.DB: %w", err)
+	}
+	if err := sqlDB.Ping(); err != nil {
 		return nil, fmt.Errorf("gagal ping SQLite: %w", err)
 	}
+	
 	return db, nil
-}
-
-// parseTime memparse string waktu dari SQLite ke time.Time.
-// Toleran terhadap beberapa format yang mungkin dihasilkan SQLite.
-func parseTime(s string) time.Time {
-	formats := []string{
-		time.RFC3339Nano,
-		time.RFC3339,
-		"2006-01-02T15:04:05Z",
-		"2006-01-02 15:04:05",
-	}
-	for _, f := range formats {
-		if t, err := time.Parse(f, s); err == nil {
-			return t
-		}
-	}
-	return time.Time{}
 }

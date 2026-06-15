@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"errors"
-	"fmt"
 	"net/http"
 	"os"
 	"os/signal"
@@ -13,9 +12,9 @@ import (
 	"github.com/gorilla/mux"
 	// Import Handler dan Logika Tracking dari folder internal kelompok
 
-	"github.com/tubes-cc/logistics/internal/logger"
 	"github.com/tubes-cc/logistics/internal/config"
 	"github.com/tubes-cc/logistics/internal/handler"
+	"github.com/tubes-cc/logistics/internal/logger"
 	"github.com/tubes-cc/logistics/internal/middleware"
 	"github.com/tubes-cc/logistics/internal/tracking"
 
@@ -41,6 +40,12 @@ func main() {
 		zap.L().Fatal("Failed to connect to tracking database", zap.Error(err))
 	}
 
+	sqlDB, err := db.DB()
+	if err != nil {
+		zap.L().Fatal("Failed to get raw database connection", zap.Error(err))
+	}
+	defer sqlDB.Close()
+
 	// Auto-migrate Tracking models
 	if err := db.AutoMigrate(&tracking.TrackingEventModel{}, &tracking.ShipmentModel{}); err != nil {
 		zap.L().Fatal("Failed to auto-migrate tracking tables", zap.Error(err))
@@ -55,10 +60,16 @@ func main() {
 	// Daftarkan Route ke handler kelompok
 	r.HandleFunc("/track", handler.HandleSendTrackingHTTP(*trackingService)).Methods("POST")
 	r.HandleFunc("/events", handler.HandleSendTrackingHTTP(*trackingService)).Methods("POST")
+	r.HandleFunc("/tracking/{resiID}", handler.HandleGetTrackingHTTP(*trackingService)).Methods("GET")
 
 	// Health check endpoint
 	r.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
+		if err := sqlDB.Ping(); err != nil {
+			w.WriteHeader(http.StatusServiceUnavailable)
+			w.Write([]byte(`{"status":"DOWN","service":"tracking","reason":"database ping failed"}`))
+			return
+		}
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte(`{"status":"UP","service":"tracking"}`))
 	}).Methods("GET")
@@ -67,7 +78,7 @@ func main() {
 
 	srv := &http.Server{
 		Addr:         port,
-		Handler:      middleware.CORS(middleware.RequestIDMiddleware(middleware.LoggingMiddleware(r))),
+		Handler:      middleware.CORS(middleware.RequestIDMiddleware(middleware.LoggingMiddleware(middleware.RecoveryMiddleware(r)))),
 		ReadTimeout:  10 * time.Second,
 		WriteTimeout: 10 * time.Second,
 		IdleTimeout:  60 * time.Second,
@@ -77,9 +88,9 @@ func main() {
 	defer stop()
 
 	go func() {
-		zap.L().Info(fmt.Sprintf("Tracking Service is running on port %s", port))
+		zap.L().Info("Tracking Service is running", zap.String("port", port))
 		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			zap.L().Error("Failed to start server", zap.Error(err))
+			zap.L().Fatal("Failed to start server", zap.Error(err))
 		}
 	}()
 

@@ -81,7 +81,12 @@ func setupTest(t *testing.T) *testEnv {
 	require.NoError(t, err)
 
 	// Tutup DB saat test selesai
-	t.Cleanup(func() { db.Close() })
+	t.Cleanup(func() {
+		sqlDB, err := db.DB()
+		if err == nil {
+			sqlDB.Close()
+		}
+	})
 
 	trackingStub := &stubTrackingClient{
 		repo: repo,

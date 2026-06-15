@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"errors"
-	"fmt"
 	"net/http"
 	"os"
 	"os/signal"
@@ -14,9 +13,9 @@ import (
 	// Import Handler dan Logika Pricing dari folder internal kelompok
 
 	"github.com/tubes-cc/logistics/client"
-	"github.com/tubes-cc/logistics/internal/logger"
 	"github.com/tubes-cc/logistics/internal/config"
 	"github.com/tubes-cc/logistics/internal/handler"
+	"github.com/tubes-cc/logistics/internal/logger"
 	"github.com/tubes-cc/logistics/internal/middleware"
 	"github.com/tubes-cc/logistics/internal/order"
 	"github.com/tubes-cc/logistics/internal/response"
@@ -43,6 +42,12 @@ func main() {
 	if err != nil {
 		zap.L().Fatal("Failed to open database", zap.Error(err))
 	}
+
+	sqlDB, err := db.DB()
+	if err != nil {
+		zap.L().Fatal("Failed to get raw database connection", zap.Error(err))
+	}
+	defer sqlDB.Close()
 
 	orderRepo, err := order.NewOrderRepository(db)
 	if err != nil {
@@ -85,6 +90,11 @@ func main() {
 	// Health check endpoint
 	router.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
+		if err := sqlDB.Ping(); err != nil {
+			w.WriteHeader(http.StatusServiceUnavailable)
+			w.Write([]byte(`{"status":"DOWN","service":"order","reason":"database ping failed"}`))
+			return
+		}
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte(`{"status":"UP","service":"order"}`))
 	}).Methods("GET")
@@ -94,7 +104,7 @@ func main() {
 
 	srv := &http.Server{
 		Addr:         port,
-		Handler:      middleware.CORS(middleware.RequestIDMiddleware(middleware.LoggingMiddleware(router))),
+		Handler:      middleware.CORS(middleware.RequestIDMiddleware(middleware.LoggingMiddleware(middleware.RecoveryMiddleware(router)))),
 		ReadTimeout:  10 * time.Second,
 		WriteTimeout: 10 * time.Second,
 		IdleTimeout:  60 * time.Second,
@@ -104,9 +114,9 @@ func main() {
 	defer stop()
 
 	go func() {
-		zap.L().Info(fmt.Sprintf("Order Service is running on port %s", port))
+		zap.L().Info("Order Service is running", zap.String("port", port))
 		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			zap.L().Error("Failed to start server", zap.Error(err))
+			zap.L().Fatal("Failed to start server", zap.Error(err))
 		}
 	}()
 

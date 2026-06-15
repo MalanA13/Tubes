@@ -13,7 +13,7 @@ services:
       - PORT=8081
       - TRACKING_SVC_URL=http://tracking-service:8083
       - ORDER_SVC_URL=http://order-service:8081
-      - AUTH_SVC_URL=http://auth-service:8080
+      - AUTH_SVC_URL=http://auth-service:8087
       - PRICING_SVC_URL=http://pricing-service:8082
     networks:
       - logistics-net
@@ -30,7 +30,7 @@ services:
       - PORT=8082
       - TRACKING_SVC_URL=http://tracking-service:8083
       - ORDER_SVC_URL=http://order-service:8081
-      - AUTH_SVC_URL=http://auth-service:8080
+      - AUTH_SVC_URL=http://auth-service:8087
       - PRICING_SVC_URL=http://pricing-service:8082
     networks:
       - logistics-net
@@ -47,7 +47,7 @@ services:
       - PORT=8083
       - TRACKING_SVC_URL=http://tracking-service:8083
       - ORDER_SVC_URL=http://order-service:8081
-      - AUTH_SVC_URL=http://auth-service:8080
+      - AUTH_SVC_URL=http://auth-service:8087
     networks:
       - logistics-net
 
@@ -63,7 +63,7 @@ services:
       - PORT=8084
       - TRACKING_SVC_URL=http://tracking-service:8083
       - ORDER_SVC_URL=http://order-service:8081
-      - AUTH_SVC_URL=http://auth-service:8080
+      - AUTH_SVC_URL=http://auth-service:8087
     networks:
       - logistics-net
 
@@ -79,7 +79,7 @@ services:
       - PORT=8085
       - TRACKING_SVC_URL=http://tracking-service:8083
       - ORDER_SVC_URL=http://order-service:8081
-      - AUTH_SVC_URL=http://auth-service:8080
+      - AUTH_SVC_URL=http://auth-service:8087
     networks:
       - logistics-net
 
@@ -88,14 +88,14 @@ services:
       context: ../../
       dockerfile: deployments/docker/notification.Dockerfile
     ports:
-      - "8086:8080"
+      - "8086:8086"
     image: muhiban/notification-service:v1
     container_name: logistics-notification
     environment:
       - PORT=8086
       - TRACKING_SVC_URL=http://tracking-service:8083
       - ORDER_SVC_URL=http://order-service:8081
-      - AUTH_SVC_URL=http://auth-service:8080
+      - AUTH_SVC_URL=http://auth-service:8087
     networks:
       - logistics-net
   
@@ -104,14 +104,14 @@ services:
       context: ../../
       dockerfile: deployments/docker/auth.Dockerfile
     ports:
-      - "8087:8080"
+      - "8087:8087"
     image: muhiban/auth-service:v1
     container_name: logistics-auth
     environment:
       - PORT=8087
       - TRACKING_SVC_URL=http://tracking-service:8083
       - ORDER_SVC_URL=http://order-service:8081
-      - AUTH_SVC_URL=http://auth-service:8080
+      - AUTH_SVC_URL=http://auth-service:8087
     networks:
       - logistics-net
 

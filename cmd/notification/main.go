@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"errors"
-	"fmt"
 	"net/http"
 	"os"
 	"os/signal"
@@ -12,9 +11,9 @@ import (
 
 	"github.com/gorilla/mux"
 	models "github.com/tubes-cc/logistics/domain"
-	"github.com/tubes-cc/logistics/internal/logger"
 	"github.com/tubes-cc/logistics/internal/config"
 	"github.com/tubes-cc/logistics/internal/handler"
+	"github.com/tubes-cc/logistics/internal/logger"
 	"github.com/tubes-cc/logistics/internal/middleware"
 	"github.com/tubes-cc/logistics/internal/notification"
 
@@ -40,6 +39,12 @@ func main() {
 		zap.L().Fatal("Failed to connect to notification database", zap.Error(err))
 	}
 
+	sqlDB, err := db.DB()
+	if err != nil {
+		zap.L().Fatal("Failed to get raw database connection", zap.Error(err))
+	}
+	defer sqlDB.Close()
+
 	// Auto-migrate: creates the notifications table if it doesn't exist
 	if err := db.AutoMigrate(&models.Notification{}); err != nil {
 		zap.L().Fatal("Failed to auto-migrate notification table", zap.Error(err))
@@ -57,6 +62,11 @@ func main() {
 	// Health check endpoint
 	r.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
+		if err := sqlDB.Ping(); err != nil {
+			w.WriteHeader(http.StatusServiceUnavailable)
+			w.Write([]byte(`{"status":"DOWN","service":"notification","reason":"database ping failed"}`))
+			return
+		}
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte(`{"status":"UP","service":"notification"}`))
 	}).Methods("GET")
@@ -65,7 +75,7 @@ func main() {
 
 	srv := &http.Server{
 		Addr:         port,
-		Handler:      middleware.CORS(middleware.RequestIDMiddleware(middleware.LoggingMiddleware(r))),
+		Handler:      middleware.CORS(middleware.RequestIDMiddleware(middleware.LoggingMiddleware(middleware.RecoveryMiddleware(r)))),
 		ReadTimeout:  10 * time.Second,
 		WriteTimeout: 10 * time.Second,
 		IdleTimeout:  60 * time.Second,
@@ -75,9 +85,9 @@ func main() {
 	defer stop()
 
 	go func() {
-		zap.L().Info(fmt.Sprintf("Notification Service is running on port %s", port))
+		zap.L().Info("Notification Service is running", zap.String("port", port))
 		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			zap.L().Error("Failed to start server", zap.Error(err))
+			zap.L().Fatal("Failed to start server", zap.Error(err))
 		}
 	}()
 

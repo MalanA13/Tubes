@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"errors"
-	"fmt"
 	"net/http"
 	"os"
 	"os/signal"
@@ -12,14 +11,14 @@ import (
 
 	"github.com/tubes-cc/logistics/client"
 	sqliterepo "github.com/tubes-cc/logistics/infrastructure/sqlite"
-	"github.com/tubes-cc/logistics/internal/logger"
 	"github.com/tubes-cc/logistics/internal/config"
 	"github.com/tubes-cc/logistics/internal/handler"
 	"github.com/tubes-cc/logistics/internal/hub"
+	"github.com/tubes-cc/logistics/internal/logger"
 	"github.com/tubes-cc/logistics/internal/middleware"
 
-	"go.uber.org/zap"
 	"github.com/tubes-cc/logistics/internal/response"
+	"go.uber.org/zap"
 )
 
 func main() {
@@ -38,7 +37,11 @@ func main() {
 	if err != nil {
 		zap.L().Fatal("Failed to open database", zap.Error(err))
 	}
-	defer db.Close()
+	sqlDB, err := db.DB()
+	if err != nil {
+		zap.L().Fatal("Failed to get raw connection", zap.Error(err))
+	}
+	defer sqlDB.Close()
 
 	repo, err := sqliterepo.NewShipmentRepository(db)
 	if err != nil {
@@ -76,6 +79,11 @@ func main() {
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
+		if err := sqlDB.Ping(); err != nil {
+			w.WriteHeader(http.StatusServiceUnavailable)
+			w.Write([]byte(`{"status":"DOWN","service":"hub","reason":"database ping failed"}`))
+			return
+		}
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte(`{"status":"UP","service":"hub"}`))
 	})
@@ -85,7 +93,7 @@ func main() {
 
 	srv := &http.Server{
 		Addr:         port,
-		Handler:      middleware.CORS(middleware.RequestIDMiddleware(middleware.LoggingMiddleware(mux))),
+		Handler:      middleware.CORS(middleware.RequestIDMiddleware(middleware.LoggingMiddleware(middleware.RecoveryMiddleware(mux)))),
 		ReadTimeout:  10 * time.Second,
 		WriteTimeout: 10 * time.Second,
 		IdleTimeout:  60 * time.Second,
@@ -95,9 +103,9 @@ func main() {
 	defer stop()
 
 	go func() {
-		zap.L().Info(fmt.Sprintf("Hub Service is running on port %s", port))
+		zap.L().Info("Hub Service is running", zap.String("port", port))
 		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			zap.L().Error("Failed to start server", zap.Error(err))
+			zap.L().Fatal("Failed to start server", zap.Error(err))
 		}
 	}()
 

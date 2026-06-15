@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 
+	"github.com/gorilla/mux"
 	"github.com/tubes-cc/logistics/domain"
 	"github.com/tubes-cc/logistics/internal/response"
 	"github.com/tubes-cc/logistics/internal/tracking"
@@ -32,5 +33,30 @@ func HandleSendTrackingHTTP(service tracking.TrackingService) http.HandlerFunc {
 		}
 
 		response.Created(w, map[string]string{"message": "tracking event added"})
+	}
+}
+
+// HandleGetTrackingHTTP retrieves the tracking history of a given resiID.
+func HandleGetTrackingHTTP(service tracking.TrackingService) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		vars := mux.Vars(r)
+		resiID := vars["resiID"]
+		if resiID == "" {
+			response.BadRequest(w, "resiID is required")
+			return
+		}
+
+		events, err := service.GetHistory(resiID)
+		if err != nil {
+			response.InternalServerError(w, err.Error())
+			return
+		}
+
+		if len(events) == 0 {
+			response.NotFound(w, "tracking history not found for this resi")
+			return
+		}
+
+		response.OK(w, events)
 	}
 }
