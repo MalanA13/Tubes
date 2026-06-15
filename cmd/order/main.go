@@ -61,11 +61,17 @@ func main() {
 	// 3. Setup Service
 	orderService := order.NewService(orderRepo, trackingClient, pricingClient)
 
+	// 3a. Setup Auth Client and Middleware
+	authClient := client.NewHTTPAuthClient(cfg.AuthSvcURL)
+	authMiddleware := middleware.NewAuthMiddleware(authClient)
+
 	// 4. Setup Routes
 	router := mux.NewRouter()
 
 	// 5. Register the endpoints
-	router.HandleFunc("/order", handler.HandleOrderHTTP(*orderService)).Methods("POST")
+	router.Handle("/order",
+		authMiddleware.Authenticate(handler.HandleOrderHTTP(*orderService)),
+	).Methods("POST")
 	router.HandleFunc("/orders/{resiID}/validate", func(w http.ResponseWriter, r *http.Request) {
 		vars := mux.Vars(r)
 		resiID := vars["resiID"]
@@ -86,6 +92,16 @@ func main() {
 
 		response.OK(w, map[string]string{"status": "valid"})
 	}).Methods("GET")
+
+	// Authenticated: get single order by resiID
+	router.Handle("/orders/{resiID}",
+		authMiddleware.Authenticate(handler.HandleGetOrderHTTP(*orderService)),
+	).Methods("GET")
+
+	// Authenticated: list caller's orders
+	router.Handle("/orders",
+		authMiddleware.Authenticate(handler.HandleListOrdersHTTP(*orderService)),
+	).Methods("GET")
 
 	// Health check endpoint
 	router.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {

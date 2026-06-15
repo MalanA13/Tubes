@@ -1,6 +1,7 @@
 package order
 
 import (
+	"errors"
 	"time"
 
 	"github.com/tubes-cc/logistics/domain"
@@ -11,6 +12,7 @@ import (
 type OrderModel struct {
 	OrderID       string `gorm:"primaryKey"`
 	ResiID        string `gorm:"uniqueIndex"`
+	UserID        string `gorm:"index"`
 	SenderName    string
 	RecipientName string
 	Origin        string
@@ -27,6 +29,8 @@ type OrderModel struct {
 type OrderRepository interface {
 	SaveOrder(order *OrderModel) error
 	ValidateResi(resiID string) (bool, error)
+	GetOrderByResiID(resiID string) (*OrderModel, error)
+	ListOrdersByUserID(userID string) ([]*OrderModel, error)
 }
 
 type orderRepository struct {
@@ -55,4 +59,29 @@ func (r *orderRepository) ValidateResi(resiID string) (bool, error) {
 		return false, err
 	}
 	return count > 0, nil
+}
+
+// GetOrderByResiID retrieves an order by its resi ID.
+// Returns nil, nil when the order is not found.
+func (r *orderRepository) GetOrderByResiID(resiID string) (*OrderModel, error) {
+	var order OrderModel
+	err := r.db.Where("resi_id = ?", resiID).First(&order).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return &order, nil
+}
+
+// ListOrdersByUserID returns all orders belonging to the given user, ordered newest first.
+// Returns an empty slice (not nil) when no orders exist.
+func (r *orderRepository) ListOrdersByUserID(userID string) ([]*OrderModel, error) {
+	var orders []*OrderModel
+	err := r.db.Where("user_id = ?", userID).Order("created_at DESC").Find(&orders).Error
+	if err != nil {
+		return nil, err
+	}
+	return orders, nil
 }

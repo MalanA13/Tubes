@@ -53,7 +53,7 @@ func TestOrderFunctional(t *testing.T) {
 			Distance:      800.0,
 		}
 
-		res, err := service.CreateOrder(context.Background(), req)
+		res, err := service.CreateOrder(context.Background(), "functional-test-user", req)
 		assert.NoError(t, err)
 		assert.NotNil(t, res)
 		assert.NotEmpty(t, res.OrderID)

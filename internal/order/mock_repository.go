@@ -48,6 +48,30 @@ func (mr *MockOrderRepositoryMockRecorder) ValidateResi(resiID interface{}) *gom
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ValidateResi", reflect.TypeOf((*MockOrderRepository)(nil).ValidateResi), resiID)
 }
 
+func (m *MockOrderRepository) GetOrderByResiID(resiID string) (*OrderModel, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetOrderByResiID", resiID)
+	ret0, _ := ret[0].(*OrderModel)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+func (mr *MockOrderRepositoryMockRecorder) GetOrderByResiID(resiID interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetOrderByResiID", reflect.TypeOf((*MockOrderRepository)(nil).GetOrderByResiID), resiID)
+}
+
+func (m *MockOrderRepository) ListOrdersByUserID(userID string) ([]*OrderModel, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListOrdersByUserID", userID)
+	ret0, _ := ret[0].([]*OrderModel)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+func (mr *MockOrderRepositoryMockRecorder) ListOrdersByUserID(userID interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListOrdersByUserID", reflect.TypeOf((*MockOrderRepository)(nil).ListOrdersByUserID), userID)
+}
+
 // MockPricingClient is a mock of client.PricingClient interface.
 type MockPricingClient struct {
 	ctrl     *gomock.Controller

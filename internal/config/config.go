@@ -30,6 +30,7 @@ type OrderConfig struct {
 	DBPath         string
 	TrackingSvcURL string
 	PricingSvcURL  string
+	AuthSvcURL     string
 }
 
 // LoadOrderConfig loads configuration for the Order service.
@@ -39,6 +40,7 @@ func LoadOrderConfig() *OrderConfig {
 		DBPath:         GetEnv("ORDER_DB", "order.db"),
 		TrackingSvcURL: GetEnv("TRACKING_SVC_URL", "http://tracking-service:8083"),
 		PricingSvcURL:  GetEnv("PRICING_SVC_URL", "http://pricing-service:8082"),
+		AuthSvcURL:     GetEnv("AUTH_SVC_URL", "http://auth-service:8080"),
 	}
 }
 

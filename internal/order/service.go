@@ -27,7 +27,7 @@ func NewService(repo OrderRepository, trackingClient client.TrackingClient, pric
 }
 
 // CreateOrder processes a new order, calculates price, generates AWB, and starts tracking.
-func (s *OrderService) CreateOrder(ctx context.Context, req domain.OrderRequest) (*domain.OrderResponse, error) {
+func (s *OrderService) CreateOrder(ctx context.Context, userID string, req domain.OrderRequest) (*domain.OrderResponse, error) {
 	if req.SenderName == "" || req.RecipientName == "" {
 		return nil, fmt.Errorf("sender and recipient names are required")
 	}
@@ -54,6 +54,7 @@ func (s *OrderService) CreateOrder(ctx context.Context, req domain.OrderRequest)
 	orderModel := &OrderModel{
 		OrderID:       orderID,
 		ResiID:        resiID,
+		UserID:        userID,
 		SenderName:    req.SenderName,
 		RecipientName: req.RecipientName,
 		Origin:        req.Origin,
@@ -89,4 +90,26 @@ func (s *OrderService) CreateOrder(ctx context.Context, req domain.OrderRequest)
 		Status:    domain.StatusCreated,
 		TotalCost: pricingRes.TotalCost,
 	}, nil
+}
+
+// GetOrderByResiID retrieves an order by resiID and validates caller ownership.
+// Returns domain.ErrShipmentNotFound if not found.
+// Returns domain.ErrForbidden if order exists but belongs to a different user.
+func (s *OrderService) GetOrderByResiID(userID, resiID string) (*OrderModel, error) {
+	order, err := s.repo.GetOrderByResiID(resiID)
+	if err != nil {
+		return nil, err
+	}
+	if order == nil {
+		return nil, domain.ErrShipmentNotFound
+	}
+	if order.UserID != userID {
+		return nil, domain.ErrForbidden
+	}
+	return order, nil
+}
+
+// ListOrdersByUserID returns all orders belonging to a user.
+func (s *OrderService) ListOrdersByUserID(userID string) ([]*OrderModel, error) {
+	return s.repo.ListOrdersByUserID(userID)
 }
