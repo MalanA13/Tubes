@@ -17,17 +17,19 @@ type Service struct {
 	repo           Repository
 	trackingClient client.TrackingClient
 	orderClient    client.OrderClient
+	authClient     client.AuthClient
 }
 
 // NewService membuat instance Courier Service baru.
 //
 // Contoh:
-//   svc := courier.NewService(sqliteRepo, httpTrackingClient, httpOrderClient)
-func NewService(repo Repository, tc client.TrackingClient, oc client.OrderClient) *Service {
+//   svc := courier.NewService(sqliteRepo, httpTrackingClient, httpOrderClient, httpAuthClient)
+func NewService(repo Repository, tc client.TrackingClient, oc client.OrderClient, ac client.AuthClient) *Service {
 	return &Service{
 		repo:           repo,
 		trackingClient: tc,
 		orderClient:    oc,
+		authClient:     ac,
 	}
 }
 
@@ -49,7 +51,13 @@ func (s *Service) AssignCourier(ctx context.Context, resiID, courierID string) e
 		return domain.ErrInvalidCourierID
 	}
 
-	// 2. Validasi resi
+	// 2. Validasi bahwa courierID merupakan User.ID yang valid dengan role='courier'
+	// CourierID sekarang harus berupa User.ID (string dari uint, misal "123")
+	if err := s.authClient.ValidateUserRole(ctx, courierID, domain.RoleCourier); err != nil {
+		return fmt.Errorf("assign-courier: %w", err)
+	}
+
+	// 3. Validasi resi
 	if err := s.orderClient.ValidateResi(ctx, resiID); err != nil {
 		return fmt.Errorf("assign-courier: validasi resi gagal: %w", err)
 	}
@@ -77,9 +85,10 @@ func (s *Service) AssignCourier(ctx context.Context, resiID, courierID string) e
 		return domain.ErrCourierAlreadyAssigned
 	}
 
-	// 5. Update
+	// 5. Update - store both CourierID and CourierUserID
 	now := time.Now()
-	shipment.CourierID = courierID
+	shipment.CourierID = courierID           // Display identifier (sama dengan UserID untuk sistem baru)
+	shipment.CourierUserID = courierID       // User.ID untuk ownership validation
 	shipment.Status = domain.StatusOutDelivery
 	shipment.UpdatedAt = now
 
@@ -114,14 +123,18 @@ var validDeliveryStatuses = map[domain.TrackingStatus]bool{
 // UpdateDeliveryStatus memperbarui status pengiriman akhir oleh kurir.
 //
 // Flow:
-//  1. Validasi resiID
+//  1. Validasi resiID dan claims
 //  2. Validasi status (DELIVERED/FAILED/RETURNED) dan proofURL
 //  3. Validasi resi ke Order Service
-//  4. Status harus OUT_DELIVERY
-//  5. Update status & proof
-//  6. Kirim tracking event
-func (s *Service) UpdateDeliveryStatus(ctx context.Context, resiID string, status domain.TrackingStatus, proofURL string) error {
+//  4. Ambil shipment dan validasi ownership
+//  5. Status harus OUT_DELIVERY
+//  6. Update status & proof
+//  7. Kirim tracking event
+func (s *Service) UpdateDeliveryStatus(ctx context.Context, claims *domain.AuthClaims, resiID string, status domain.TrackingStatus, proofURL string) error {
 	// 1. Validasi input dasar
+	if claims == nil {
+		return domain.ErrUnauthorized
+	}
 	if resiID == "" {
 		return domain.ErrInvalidResiID
 	}
@@ -140,12 +153,25 @@ func (s *Service) UpdateDeliveryStatus(ctx context.Context, resiID string, statu
 		return fmt.Errorf("update-delivery: validasi resi gagal: %w", err)
 	}
 
-	// 4. Ambil & validasi
+	// 4. Ambil shipment
 	shipment, err := s.repo.GetShipment(ctx, resiID)
 	if err != nil {
 		return fmt.Errorf("update-delivery: gagal ambil shipment: %w", err)
 	}
 
+	// 5. OWNERSHIP VALIDATION - Critical security check
+	// Shipment harus memiliki CourierUserID yang terisi (sistem baru)
+	if shipment.CourierUserID == "" {
+		return fmt.Errorf("update-delivery: shipment belum di-assign dengan sistem baru, tidak dapat diupdate: %w",
+			domain.ErrUnauthorized)
+	}
+	
+	// Validasi bahwa courier yang authenticated adalah pemilik shipment ini
+	if claims.UserID != shipment.CourierUserID {
+		return fmt.Errorf("update-delivery: %w", domain.ErrNotShipmentOwner)
+	}
+
+	// 6. Validasi status
 	if shipment.Status != domain.StatusOutDelivery {
 		return fmt.Errorf("update-delivery: status saat ini '%s', harus 'OUT_DELIVERY': %w",
 			shipment.Status, domain.ErrInvalidStatus)

@@ -12,6 +12,7 @@ import (
 	"github.com/gorilla/mux"
 	// Import Handler dan Logika Tracking dari folder internal kelompok
 
+	"github.com/tubes-cc/logistics/client"
 	"github.com/tubes-cc/logistics/internal/config"
 	"github.com/tubes-cc/logistics/internal/handler"
 	"github.com/tubes-cc/logistics/internal/logger"
@@ -57,11 +58,26 @@ func main() {
 	trackingRepo := tracking.NewTrackingRepository(db)
 	trackingService := tracking.NewTrackingService(trackingRepo)
 
+	// Setup Auth Client and Middleware
+	authClient := client.NewHTTPAuthClient(cfg.AuthSvcURL)
+	authMiddleware := middleware.NewAuthMiddleware(authClient)
+
 	// Daftarkan Route ke handler kelompok
-	r.HandleFunc("/track", handler.HandleSendTrackingHTTP(*trackingService)).Methods("POST")
-	r.HandleFunc("/events", handler.HandleSendTrackingHTTP(*trackingService)).Methods("POST")
-	r.HandleFunc("/tracking/{resiID}/status", handler.HandleGetCurrentStatusHTTP(*trackingService)).Methods("GET")
-	r.HandleFunc("/tracking/{resiID}", handler.HandleGetTrackingHTTP(*trackingService)).Methods("GET")
+	// POST endpoints require admin role
+	r.Handle("/track", authMiddleware.Authenticate(
+		authMiddleware.RequireRole("admin", handler.HandleSendTrackingHTTP(*trackingService)),
+	)).Methods("POST")
+	r.Handle("/events", authMiddleware.Authenticate(
+		authMiddleware.RequireRole("admin", handler.HandleSendTrackingHTTP(*trackingService)),
+	)).Methods("POST")
+
+	// GET endpoints require authentication only
+	r.Handle("/tracking/{resiID}/status", authMiddleware.Authenticate(
+		handler.HandleGetCurrentStatusHTTP(*trackingService),
+	)).Methods("GET")
+	r.Handle("/tracking/{resiID}", authMiddleware.Authenticate(
+		handler.HandleGetTrackingHTTP(*trackingService),
+	)).Methods("GET")
 
 	// Health check endpoint
 	r.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {

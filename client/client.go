@@ -57,4 +57,8 @@ type AuthClient interface {
 	// ValidateToken memvalidasi token JWT dan mengembalikan klaim-nya.
 	// Mengembalikan domain.ErrUnauthorized jika token tidak valid.
 	ValidateToken(ctx context.Context, token string) (*domain.AuthClaims, error)
+
+	// ValidateUserRole memvalidasi bahwa user dengan ID tertentu exists dan memiliki role yang diminta.
+	// Mengembalikan domain.ErrInvalidCourierUser jika user tidak ditemukan atau tidak memiliki role yang sesuai.
+	ValidateUserRole(ctx context.Context, userID string, expectedRole domain.UserRole) error
 }

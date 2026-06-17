@@ -1,7 +1,10 @@
 package auth
 
 import (
-    models "github.com/tubes-cc/logistics/domain"
+	"context"
+	"strconv"
+
+	models "github.com/tubes-cc/logistics/domain"
 	"gorm.io/gorm"
 )
 
@@ -20,6 +23,20 @@ func (r *userRepositoryImpl) GetByEmail(email string) (*models.User, error) {
 	var user models.User
 	// Query GORM: SELECT * FROM users WHERE email = 'email' LIMIT 1;
 	err := r.db.Where("email = ?", email).First(&user).Error
+	return &user, err
+}
+
+// GetUserByID mencari user berdasarkan ID (string dikonversi ke uint)
+func (r *userRepositoryImpl) GetUserByID(ctx context.Context, userID string) (*models.User, error) {
+	// Konversi string ID ke uint
+	id, err := strconv.ParseUint(userID, 10, 32)
+	if err != nil {
+		return nil, gorm.ErrRecordNotFound
+	}
+
+	var user models.User
+	// Query GORM: SELECT * FROM users WHERE id = ? LIMIT 1;
+	err = r.db.WithContext(ctx).Where("id = ?", uint(id)).First(&user).Error
 	return &user, err
 }
 

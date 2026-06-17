@@ -65,6 +65,18 @@ func (s *stubOrderClientInvalid) ValidateResi(_ context.Context, _ string) error
 	return domain.ErrResiInvalid
 }
 
+// stubAuthClient selalu menganggap user valid dengan role yang sesuai.
+// Untuk test yang membutuhkan validasi role, gunakan stub ini.
+type stubAuthClient struct{}
+
+func (s *stubAuthClient) ValidateToken(_ context.Context, _ string) (*domain.AuthClaims, error) {
+	return &domain.AuthClaims{UserID: "test-user", Role: domain.RoleAdmin}, nil
+}
+
+func (s *stubAuthClient) ValidateUserRole(_ context.Context, _ string, _ domain.UserRole) error {
+	return nil
+}
+
 // ================================================================
 // SETUP HELPER
 // ================================================================
@@ -102,12 +114,13 @@ func setupTest(t *testing.T) *testEnv {
 	}
 
 	orderStub := &stubOrderClient{}
+	authStub := &stubAuthClient{}
 
 	return &testEnv{
 		repo:           repo,
 		trackingStub:   trackingStub,
 		hubService:     hub.NewService(repo, trackingStub, orderStub),
-		courierService: courier.NewService(repo, trackingStub, orderStub),
+		courierService: courier.NewService(repo, trackingStub, orderStub, authStub),
 	}
 }
 
@@ -152,7 +165,8 @@ func TestFullDeliveryFlow_HappyPath(t *testing.T) {
 	// --- Step 4: UpdateDeliveryStatus → DELIVERED ---
 	t.Log("▶ Step 4: Update Status DELIVERED")
 	proofURL := "https://storage.example.com/proof/RESI-001.jpg"
-	err = env.courierService.UpdateDeliveryStatus(ctx, "RESI-001", domain.StatusDelivered, proofURL)
+	claims := &domain.AuthClaims{UserID: "KURIR-BUDI-01", Role: domain.RoleCourier}
+	err = env.courierService.UpdateDeliveryStatus(ctx, claims, "RESI-001", domain.StatusDelivered, proofURL)
 	require.NoError(t, err)
 
 	s, _ = env.repo.GetShipment(ctx, "RESI-001")
@@ -196,7 +210,8 @@ func TestFailedDeliveryFlow(t *testing.T) {
 	require.NoError(t, env.courierService.AssignCourier(ctx, "RESI-002", "KURIR-ANI-01"))
 
 	// FAILED tidak perlu proofURL
-	err := env.courierService.UpdateDeliveryStatus(ctx, "RESI-002", domain.StatusFailed, "")
+	claims := &domain.AuthClaims{UserID: "KURIR-ANI-01", Role: domain.RoleCourier}
+	err := env.courierService.UpdateDeliveryStatus(ctx, claims, "RESI-002", domain.StatusFailed, "")
 	require.NoError(t, err)
 
 	s, _ := env.repo.GetShipment(ctx, "RESI-002")
@@ -231,8 +246,9 @@ func TestMultiHubTransit(t *testing.T) {
 
 	// Kirim ke penerima
 	require.NoError(t, env.courierService.AssignCourier(ctx, "RESI-003", "KURIR-DENI-01"))
+	claims := &domain.AuthClaims{UserID: "KURIR-DENI-01", Role: domain.RoleCourier}
 	require.NoError(t, env.courierService.UpdateDeliveryStatus(
-		ctx, "RESI-003", domain.StatusDelivered, "https://proof.example.com/003.jpg",
+		ctx, claims, "RESI-003", domain.StatusDelivered, "https://proof.example.com/003.jpg",
 	))
 
 	// 6 events total: ScanIn(JKT), ScanOut(JKT), ScanIn(BDG), ScanOut(BDG), Assign, Delivered
@@ -304,7 +320,8 @@ func TestDeliveredWithoutProof_ShouldFail(t *testing.T) {
 	require.NoError(t, env.courierService.AssignCourier(ctx, "RESI-007", "KURIR-EKO-01"))
 
 	// DELIVERED tanpa proof URL — harus error
-	err := env.courierService.UpdateDeliveryStatus(ctx, "RESI-007", domain.StatusDelivered, "")
+	claims := &domain.AuthClaims{UserID: "KURIR-007", Role: domain.RoleCourier}
+	err := env.courierService.UpdateDeliveryStatus(ctx, claims, "RESI-007", domain.StatusDelivered, "")
 	assert.ErrorIs(t, err, domain.ErrInvalidProofURL)
 
 	t.Log("✅ DELIVERED tanpa proof URL berhasil diblok!")
@@ -317,8 +334,9 @@ func TestResiValidation_ShouldFail(t *testing.T) {
 
 	// Ganti dengan order client yang selalu menolak
 	invalidOrderClient := &stubOrderClientInvalid{}
+	authStub := &stubAuthClient{}
 	hubSvc := hub.NewService(env.repo, env.trackingStub, invalidOrderClient)
-	courierSvc := courier.NewService(env.repo, env.trackingStub, invalidOrderClient)
+	courierSvc := courier.NewService(env.repo, env.trackingStub, invalidOrderClient, authStub)
 
 	err := hubSvc.ScanIn(ctx, "RESI-PALSU", "HUB-JKT-01")
 	assert.ErrorIs(t, err, domain.ErrResiInvalid)
@@ -329,7 +347,8 @@ func TestResiValidation_ShouldFail(t *testing.T) {
 	err = courierSvc.AssignCourier(ctx, "RESI-PALSU", "KURIR-001")
 	assert.ErrorIs(t, err, domain.ErrResiInvalid)
 
-	err = courierSvc.UpdateDeliveryStatus(ctx, "RESI-PALSU", domain.StatusFailed, "")
+	claims := &domain.AuthClaims{UserID: "KURIR-PALSU", Role: domain.RoleCourier}
+	err = courierSvc.UpdateDeliveryStatus(ctx, claims, "RESI-PALSU", domain.StatusFailed, "")
 	assert.ErrorIs(t, err, domain.ErrResiInvalid)
 
 	t.Log("✅ Validasi resi tidak valid berhasil!")

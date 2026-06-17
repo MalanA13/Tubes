@@ -5,6 +5,7 @@
 package auth
 
 import (
+	context "context"
 	reflect "reflect"
 	models "github.com/tubes-cc/logistics/domain"
 
@@ -61,4 +62,19 @@ func (m *MockUserRepository) GetByEmail(email string) (*models.User, error) {
 func (mr *MockUserRepositoryMockRecorder) GetByEmail(email interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetByEmail", reflect.TypeOf((*MockUserRepository)(nil).GetByEmail), email)
+}
+
+// GetUserByID mocks base method.
+func (m *MockUserRepository) GetUserByID(ctx context.Context, userID string) (*models.User, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetUserByID", ctx, userID)
+	ret0, _ := ret[0].(*models.User)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetUserByID indicates an expected call of GetUserByID.
+func (mr *MockUserRepositoryMockRecorder) GetUserByID(ctx, userID interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetUserByID", reflect.TypeOf((*MockUserRepository)(nil).GetUserByID), ctx, userID)
 }

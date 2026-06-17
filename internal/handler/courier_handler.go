@@ -7,6 +7,7 @@ import (
 
 	"github.com/tubes-cc/logistics/domain"
 	"github.com/tubes-cc/logistics/internal/courier"
+	"github.com/tubes-cc/logistics/internal/middleware"
 	"github.com/tubes-cc/logistics/internal/response"
 )
 
@@ -69,9 +70,18 @@ func (h *CourierHandler) AssignCourier(w http.ResponseWriter, r *http.Request) {
 //	{"resi_id": "JNE-001", "status": "DELIVERED", "proof_url": "https://..."}
 //
 // Status yang valid: DELIVERED (wajib proof_url), FAILED, RETURNED
+//
+// Security: Validates that authenticated courier is the owner of the shipment
 func (h *CourierHandler) UpdateDeliveryStatus(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		response.MethodNotAllowed(w, "gunakan POST")
+		return
+	}
+
+	// Extract claims from context (set by Authenticate middleware)
+	claims := middleware.GetAuthClaims(r)
+	if claims == nil {
+		response.Unauthorized(w, "authentication required")
 		return
 	}
 
@@ -81,7 +91,8 @@ func (h *CourierHandler) UpdateDeliveryStatus(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	if err := h.service.UpdateDeliveryStatus(r.Context(), req.ResiID, req.Status, req.ProofURL); err != nil {
+	// Pass claims to service for ownership validation
+	if err := h.service.UpdateDeliveryStatus(r.Context(), claims, req.ResiID, req.Status, req.ProofURL); err != nil {
 		response.BadRequest(w, err.Error())
 		return
 	}

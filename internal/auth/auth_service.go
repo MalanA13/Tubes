@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
@@ -116,6 +117,31 @@ func (s *AuthService) ValidateToken(tokenString string) (*models.AuthClaims, err
 	}
 
 	return claims, nil
+}
+
+// ValidateUserRole validates that a user exists and has the expected role.
+// Returns domain.ErrInvalidCourierUser if user not found or role mismatch.
+func (s *AuthService) ValidateUserRole(ctx context.Context, userID string, expectedRole models.UserRole) error {
+	if userID == "" {
+		return models.ErrInvalidCourierUser
+	}
+
+	user, err := s.repo.GetUserByID(ctx, userID)
+	if err != nil {
+		// User not found
+		return models.ErrInvalidCourierUser
+	}
+
+	if user == nil {
+		return models.ErrInvalidCourierUser
+	}
+
+	// Check if user has the expected role
+	if models.UserRole(user.Role) != expectedRole {
+		return models.ErrInvalidCourierUser
+	}
+
+	return nil
 }
 
 // generateToken creates a new JWT token for a user.

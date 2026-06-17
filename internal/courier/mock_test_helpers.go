@@ -160,3 +160,49 @@ func (mr *MockOrderClientMockRecorder) ValidateResi(ctx, resiID interface{}) *go
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ValidateResi",
 		reflect.TypeOf((*MockOrderClient)(nil).ValidateResi), ctx, resiID)
 }
+
+// ================================================================
+// MockAuthClient
+// ================================================================
+
+type MockAuthClient struct {
+	ctrl     *gomock.Controller
+	recorder *MockAuthClientMockRecorder
+}
+
+type MockAuthClientMockRecorder struct{ mock *MockAuthClient }
+
+func NewMockAuthClient(ctrl *gomock.Controller) *MockAuthClient {
+	mock := &MockAuthClient{ctrl: ctrl}
+	mock.recorder = &MockAuthClientMockRecorder{mock}
+	return mock
+}
+
+func (m *MockAuthClient) EXPECT() *MockAuthClientMockRecorder { return m.recorder }
+
+func (m *MockAuthClient) ValidateToken(ctx context.Context, token string) (*domain.AuthClaims, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ValidateToken", ctx, token)
+	ret0, _ := ret[0].(*domain.AuthClaims)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+func (mr *MockAuthClientMockRecorder) ValidateToken(ctx, token interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ValidateToken",
+		reflect.TypeOf((*MockAuthClient)(nil).ValidateToken), ctx, token)
+}
+
+func (m *MockAuthClient) ValidateUserRole(ctx context.Context, userID string, expectedRole domain.UserRole) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ValidateUserRole", ctx, userID, expectedRole)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+func (mr *MockAuthClientMockRecorder) ValidateUserRole(ctx, userID, expectedRole interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ValidateUserRole",
+		reflect.TypeOf((*MockAuthClient)(nil).ValidateUserRole), ctx, userID, expectedRole)
+}

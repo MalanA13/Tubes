@@ -36,4 +36,10 @@ var (
 
 	// ErrForbidden dikembalikan ketika role tidak memiliki akses.
 	ErrForbidden = errors.New("forbidden: insufficient role")
+
+	// ErrNotShipmentOwner dikembalikan ketika user bukan pemilik shipment.
+	ErrNotShipmentOwner = errors.New("forbidden: you are not the assigned courier for this shipment")
+
+	// ErrInvalidCourierUser dikembalikan ketika courier user tidak valid atau tidak memiliki role courier.
+	ErrInvalidCourierUser = errors.New("invalid courier: user does not exist or does not have courier role")
 )

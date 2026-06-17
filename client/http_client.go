@@ -306,3 +306,51 @@ func (c *HTTPAuthClient) ValidateToken(ctx context.Context, token string) (*doma
 		Role:   domain.UserRole(result.Role),
 	}, nil
 }
+
+// validateUserRoleRequest adalah request body untuk validasi user dan role.
+type validateUserRoleRequest struct {
+	UserID string `json:"user_id"`
+	Role   string `json:"role"`
+}
+
+// ValidateUserRole memvalidasi bahwa user exists dan memiliki role yang sesuai.
+// Endpoint auth service: POST /auth/validate-user-role
+// Request: {"user_id": "123", "role": "courier"}
+// Response 200: User valid dengan role sesuai
+// Response 400/404: User tidak ditemukan atau role tidak sesuai
+func (c *HTTPAuthClient) ValidateUserRole(ctx context.Context, userID string, expectedRole domain.UserRole) error {
+	reqBody := validateUserRoleRequest{
+		UserID: userID,
+		Role:   string(expectedRole),
+	}
+	
+	body, err := json.Marshal(reqBody)
+	if err != nil {
+		return fmt.Errorf("auth client: marshal request: %w", err)
+	}
+	
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL+"/auth/validate-user-role", bytes.NewReader(body))
+	if err != nil {
+		return fmt.Errorf("auth client: buat request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	if reqID := contextutil.GetRequestID(ctx); reqID != "" {
+		req.Header.Set(contextutil.RequestIDHeader, reqID)
+	}
+	
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("auth client: kirim request: %w", err)
+	}
+	defer resp.Body.Close()
+	
+	// 400/404 = user tidak ditemukan atau role tidak sesuai
+	if resp.StatusCode == http.StatusBadRequest || resp.StatusCode == http.StatusNotFound {
+		return domain.ErrInvalidCourierUser
+	}
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("auth client: status tidak OK: %d", resp.StatusCode)
+	}
+	
+	return nil
+}

@@ -60,15 +60,17 @@ func LoadPricingConfig() *PricingConfig {
 
 // TrackingConfig holds configurations for the Tracking service.
 type TrackingConfig struct {
-	Port   string
-	DBPath string
+	Port       string
+	DBPath     string
+	AuthSvcURL string
 }
 
 // LoadTrackingConfig loads configuration for the Tracking service.
 func LoadTrackingConfig() *TrackingConfig {
 	return &TrackingConfig{
-		Port:   GetEnv("PORT", "8083"),
-		DBPath: GetEnv("TRACKING_DB", "tracking.db"),
+		Port:       GetEnv("PORT", "8083"),
+		DBPath:     GetEnv("TRACKING_DB", "tracking.db"),
+		AuthSvcURL: GetEnv("AUTH_SVC_URL", "http://auth-service:8080"),
 	}
 }
 

@@ -54,7 +54,7 @@ func main() {
 	authClient := client.NewHTTPAuthClient(cfg.AuthSvcURL)
 
 	// 3. Setup Service
-	courierService := courier.NewService(repo, trackingClient, orderClient)
+	courierService := courier.NewService(repo, trackingClient, orderClient, authClient)
 
 	// 4. Setup Handlers & Middleware
 	courierHandler := handler.NewCourierHandler(courierService)

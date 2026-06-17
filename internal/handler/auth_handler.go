@@ -95,3 +95,41 @@ func HandleValidateToken(s auth.AuthService) http.HandlerFunc {
 		})
 	}
 }
+
+type validateUserRoleRequest struct {
+	UserID       string `json:"user_id"`
+	ExpectedRole string `json:"expected_role"`
+}
+
+func HandleValidateUserRole(s auth.AuthService) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			response.MethodNotAllowed(w, "method not allowed")
+			return
+		}
+
+		var req validateUserRoleRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			response.BadRequest(w, "invalid request body")
+			return
+		}
+
+		if req.UserID == "" || req.ExpectedRole == "" {
+			response.BadRequest(w, "user_id and expected_role are required")
+			return
+		}
+
+		// Convert string role to domain.UserRole
+		expectedRole := models.UserRole(req.ExpectedRole)
+
+		if err := s.ValidateUserRole(r.Context(), req.UserID, expectedRole); err != nil {
+			response.Forbidden(w, err.Error())
+			return
+		}
+
+		response.OK(w, map[string]interface{}{
+			"valid": true,
+			"message": "user has the expected role",
+		})
+	}
+}

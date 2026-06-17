@@ -17,12 +17,13 @@ import (
 
 // ShipmentModel merepresentasikan tabel shipments di database.
 type ShipmentModel struct {
-	ResiID    string                `gorm:"primaryKey;column:resi_id"`
-	Status    domain.TrackingStatus `gorm:"column:status;not null;default:'CREATED'"`
-	HubID     string                `gorm:"column:hub_id;not null;default:''"`
-	CourierID string                `gorm:"column:courier_id;not null;default:''"`
-	ProofURL  string                `gorm:"column:proof_url;not null;default:''"`
-	UpdatedAt time.Time             `gorm:"column:updated_at;not null"`
+	ResiID        string                `gorm:"primaryKey;column:resi_id"`
+	Status        domain.TrackingStatus `gorm:"column:status;not null;default:'CREATED'"`
+	HubID         string                `gorm:"column:hub_id;not null;default:''"`
+	CourierID     string                `gorm:"column:courier_id;not null;default:''"`
+	CourierUserID string                `gorm:"column:courier_user_id;not null;default:''"` // User.ID dari courier
+	ProofURL      string                `gorm:"column:proof_url;not null;default:''"`
+	UpdatedAt     time.Time             `gorm:"column:updated_at;not null"`
 }
 
 // TableName menentukan nama tabel shipments secara eksplisit.
@@ -75,12 +76,13 @@ func toDomainShipment(m *ShipmentModel) *domain.Shipment {
 		return nil
 	}
 	return &domain.Shipment{
-		ResiID:    m.ResiID,
-		Status:    m.Status,
-		HubID:     m.HubID,
-		CourierID: m.CourierID,
-		ProofURL:  m.ProofURL,
-		UpdatedAt: m.UpdatedAt,
+		ResiID:        m.ResiID,
+		Status:        m.Status,
+		HubID:         m.HubID,
+		CourierID:     m.CourierID,
+		CourierUserID: m.CourierUserID,
+		ProofURL:      m.ProofURL,
+		UpdatedAt:     m.UpdatedAt,
 	}
 }
 
@@ -138,11 +140,12 @@ func (r *ShipmentRepository) GetShipment(ctx context.Context, resiID string) (*d
 // Mengembalikan domain.ErrShipmentNotFound jika resiID tidak ada.
 func (r *ShipmentRepository) UpdateShipment(ctx context.Context, shipment *domain.Shipment) error {
 	updates := map[string]interface{}{
-		"status":     string(shipment.Status),
-		"hub_id":     shipment.HubID,
-		"courier_id": shipment.CourierID,
-		"proof_url":  shipment.ProofURL,
-		"updated_at": shipment.UpdatedAt,
+		"status":           string(shipment.Status),
+		"hub_id":           shipment.HubID,
+		"courier_id":       shipment.CourierID,
+		"courier_user_id":  shipment.CourierUserID,
+		"proof_url":        shipment.ProofURL,
+		"updated_at":       shipment.UpdatedAt,
 	}
 
 	result := r.db.WithContext(ctx).Model(&ShipmentModel{}).Where("resi_id = ?", shipment.ResiID).Updates(updates)

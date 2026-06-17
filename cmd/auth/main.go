@@ -62,6 +62,7 @@ func main() {
 	r.HandleFunc("/login", handler.HandleLogin(*authService)).Methods("POST")
 	r.HandleFunc("/register", handler.HandleRegister(*authService)).Methods("POST")
 	r.HandleFunc("/auth/validate", handler.HandleValidateToken(*authService)).Methods("POST")
+	r.HandleFunc("/auth/validate-role", handler.HandleValidateUserRole(*authService)).Methods("POST")
 
 	// Health check endpoint
 	r.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {

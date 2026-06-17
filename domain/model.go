@@ -70,12 +70,13 @@ type OrderResponse struct {
 
 // Shipment merepresentasikan data pengiriman / resi.
 type Shipment struct {
-	ResiID    string         `json:"resi_id"`
-	Status    TrackingStatus `json:"status"`
-	HubID     string         `json:"hub_id"`
-	CourierID string         `json:"courier_id"`
-	ProofURL  string         `json:"proof_url"`
-	UpdatedAt time.Time      `json:"updated_at"`
+	ResiID        string         `json:"resi_id"`
+	Status        TrackingStatus `json:"status"`
+	HubID         string         `json:"hub_id"`
+	CourierID     string         `json:"courier_id"`      // Display name / identifier untuk backward compatibility
+	CourierUserID string         `json:"courier_user_id"` // User.ID dari courier yang ditugaskan (untuk ownership validation)
+	ProofURL      string         `json:"proof_url"`
+	UpdatedAt     time.Time      `json:"updated_at"`
 }
 
 // TrackingEvent menyimpan history pergerakan paket.
