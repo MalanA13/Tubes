@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="id">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#4f46e5" />
+    <meta name="description" content="Aplikasi Pelacakan Pengiriman Logistik" />
+    <title>Logistics Tracking Client</title>
+    <!-- Tailwind CSS Play CDN to ensure classes work immediately without complex config -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        darkMode: 'class',
+        theme: {
+          extend: {
+            animation: {
+              fadeIn:      'fadeIn 0.25s ease-out forwards',
+              slideUp:     'slideUp 0.35s cubic-bezier(0.32,0.72,0,1) forwards',
+              slideInLeft: 'slideInLeft 0.3s cubic-bezier(0.32,0.72,0,1) forwards',
+            },
+            keyframes: {
+              fadeIn: {
+                '0%':   { opacity: '0', transform: 'translateY(8px)' },
+                '100%': { opacity: '1', transform: 'translateY(0)' },
+              },
+              slideUp: {
+                '0%':   { opacity: '0', transform: 'translateY(100%)' },
+                '100%': { opacity: '1', transform: 'translateY(0)' },
+              },
+              slideInLeft: {
+                '0%':   { opacity: '0', transform: 'translateX(-100%)' },
+                '100%': { opacity: '1', transform: 'translateX(0)' },
+              },
+            }
+          }
+        }
+      }
+    </script>
+    <style>
+      /* hide scrollbar while keeping scroll functionality */
+      .scrollbar-hide::-webkit-scrollbar { display: none; }
+      .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+    </style>
+  </head>
+  <body class="bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100">
+    <noscript>Anda perlu mengaktifkan JavaScript untuk menjalankan aplikasi ini.</noscript>
+    <div id="root"></div>
+  </body>
+</html>
