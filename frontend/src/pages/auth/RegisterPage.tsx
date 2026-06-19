@@ -17,7 +17,6 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onRegisterSuccess, o
   const [errorMsg, setErrorMsg] = useState('');
   const [showSuccessAlert, setShowSuccessAlert] = useState(false);
   const [registeredUser, setRegisteredUser] = useState<T.RegisterResponse | null>(null);
-  const [isOfflineMode, setIsOfflineMode] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -44,7 +43,6 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onRegisterSuccess, o
       const res = await registerUser(payload);
       setRegisteredUser(res);
       setShowSuccessAlert(true);
-      setIsOfflineMode(false);
 
       // Auto redirect after 2 seconds
       setTimeout(() => {
@@ -52,24 +50,7 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onRegisterSuccess, o
       }, 2000);
 
     } catch (err: any) {
-      console.warn('Backend offline or failed. Performing offline registration simulation for demonstration...');
-      
-      // Fallback register response
-      const mockResponse: T.RegisterResponse = {
-        id: Math.floor(1000 + Math.random() * 9000),
-        email: email,
-        full_name: fullName,
-        role: 'customer',
-        created_at: new Date().toISOString(),
-      };
-
-      setRegisteredUser(mockResponse);
-      setShowSuccessAlert(true);
-      setIsOfflineMode(true);
-
-      setTimeout(() => {
-        onRegisterSuccess(mockResponse);
-      }, 2000);
+      setErrorMsg(err?.message || 'Registrasi gagal. Pastikan backend auth service berjalan.');
     } finally {
       setLoading(false);
     }
@@ -111,9 +92,6 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onRegisterSuccess, o
               </div>
               <h3 className="text-sm font-bold text-emerald-800">Registrasi Berhasil!</h3>
               <p className="text-xs text-emerald-600">Selamat datang, {registeredUser.full_name}. Menghubungkan ke dashboard...</p>
-              {isOfflineMode && (
-                <span className="inline-block text-[9px] bg-amber-500 text-white px-2 py-0.5 rounded-full font-bold uppercase">Simulasi Offline</span>
-              )}
             </div>
           )}
 

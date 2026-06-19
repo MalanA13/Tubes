@@ -48,11 +48,11 @@ export interface RegisterResponse {
   created_at: string;
 }
 
-export interface validateRequest {
+export interface ValidateRequest {
   token: string;
 }
 
-export interface validateResponse {
+export interface ValidateResponse {
   user_id: string;
   role: string;
 }

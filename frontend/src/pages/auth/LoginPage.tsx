@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
-import { loginUser } from '../../services/api';
+import { loginUser, setAuthToken, validateToken } from '../../services/api';
 import * as T from '../../types';
 
 interface LoginPageProps {
-  onLoginSuccess: (token: string, email: string) => void;
+  onLoginSuccess: (token: string, email: string, role?: string) => void;
   onNavigateToRegister: () => void;
 }
 
@@ -17,7 +17,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, onNavigate
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
-  const [isOfflineMode, setIsOfflineMode] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -37,23 +36,23 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, onNavigate
 
     try {
       const res = await loginUser(payload);
+      setAuthToken(res.token);
+
+      let role: string | undefined;
+      try {
+        const validation = await validateToken(res.token);
+        role = validation.role;
+      } catch {
+        role = undefined;
+      }
+
       setSuccessMsg('Masuk berhasil! Mengalihkan ke dashboard...');
-      setIsOfflineMode(false);
-      
-      setTimeout(() => {
-        onLoginSuccess(res.token, email);
-      }, 1500);
 
+      setTimeout(() => {
+        onLoginSuccess(res.token, email, role);
+      }, 800);
     } catch (err: any) {
-      console.warn('Backend offline or login failed. Simulating offline access for demonstration...');
-      
-      setSuccessMsg('Masuk berhasil (Simulasi Offline)! Mengalihkan...');
-      setIsOfflineMode(true);
-
-      const dummyToken = `mock-token-${Math.floor(Math.random() * 1000000)}`;
-      setTimeout(() => {
-        onLoginSuccess(dummyToken, email);
-      }, 1500);
+      setErrorMsg(err?.message || 'Login gagal. Pastikan backend Auth berjalan dan kredensial benar.');
     } finally {
       setLoading(false);
     }
@@ -93,9 +92,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, onNavigate
                 </svg>
               </div>
               <p className="text-xs font-bold text-emerald-800">{successMsg}</p>
-              {isOfflineMode && (
-                <span className="inline-block text-[8px] bg-amber-500 text-white px-2 py-0.5 rounded-full font-bold uppercase tracking-wider scale-90">Simulasi Mode Offline</span>
-              )}
             </div>
           )}
 
@@ -197,41 +193,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, onNavigate
                 ) : (
                   <span>MASUK</span>
                 )}
-              </button>
-
-              {/* Quick Admin Access Button */}
-              <button
-                type="button"
-                onClick={() => {
-                  setSuccessMsg('Masuk sebagai Admin Demo... Mengalihkan...');
-                  setTimeout(() => {
-                    onLoginSuccess('mock-admin-token-12345', 'admin@skylogistics.com');
-                  }, 1000);
-                }}
-                className="w-full py-2.5 bg-sky-50 hover:bg-sky-100/70 border border-sky-100/50 text-[#009ADA] hover:text-[#2DB7F2] font-bold rounded-xl transition-all duration-200 flex items-center justify-center gap-1.5 text-xs uppercase tracking-wider"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-4 h-4">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.57-.598-3.75h-.152c-3.196 0-6.1-1.249-8.25-3.286zm0 13.036h.008v.008H12v-.008z" />
-                </svg>
-                Masuk Cepat (Demo Admin)
-              </button>
-
-              {/* Quick Courier Access Button */}
-              <button
-                type="button"
-                id="btn-demo-kurir"
-                onClick={() => {
-                  setSuccessMsg('Masuk sebagai Kurir Demo... Mengalihkan ke portal kurir...');
-                  setTimeout(() => {
-                    onLoginSuccess('mock-kurir-token-67890', 'kurir.budi@skylogistics.com');
-                  }, 1000);
-                }}
-                className="w-full py-2.5 bg-orange-50 hover:bg-orange-100/70 border border-orange-100/50 text-orange-500 hover:text-orange-600 font-bold rounded-xl transition-all duration-200 flex items-center justify-center gap-1.5 text-xs uppercase tracking-wider"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-4 h-4">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 18.75a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m3 0h6m-9 0H3.375a1.125 1.125 0 01-1.125-1.125V14.25m17.25 4.5a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m3 0h1.125c.621 0 1.129-.504 1.09-1.124a17.902 17.902 0 00-3.213-9.193 2.056 2.056 0 00-1.58-.86H14.25M16.5 18.75h-2.25m0-11.177v-.113c0-.732-.412-1.4-1.071-1.724a8.256 8.256 0 00-3.03-.69" />
-                </svg>
-                Masuk Cepat (Demo Kurir)
               </button>
 
             </form>

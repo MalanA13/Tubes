@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
+import { setAuthToken } from './services/api';
 import TrackingPage from './pages/customer/TrackingPage';
 import CreateOrderPage from './pages/customer/CreateOrderPage';
 import RegisterPage from './pages/auth/RegisterPage';
@@ -29,26 +30,33 @@ function App() {
     setActiveTab(tab);
   };
 
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+    setAuthToken(token);
+  }, []);
+
   const handleRegisterSuccess = (user: T.RegisterResponse) => {
-    localStorage.setItem('token', `mock-register-token-${user.id}`);
     setCurrentUser(user);
-    setCurrentScreen('Main');
+    setCurrentScreen('Login');
     setActiveTab('Orders');
   };
 
-  const handleLoginSuccess = (token: string, email: string) => {
+  const handleLoginSuccess = (token: string, email: string, backendRole?: string) => {
     localStorage.setItem('token', token);
+    setAuthToken(token);
     const username = email.split('@')[0];
     const formattedName = username
       .split('.')
       .map((s) => s.charAt(0).toUpperCase() + s.slice(1))
       .join(' ');
 
-    const role = email.toLowerCase().includes('admin')
-      ? 'admin'
-      : email.toLowerCase().includes('kurir') || email.toLowerCase().includes('courier')
-      ? 'courier'
-      : 'customer';
+    const role =
+      backendRole ||
+      (email.toLowerCase().includes('admin')
+        ? 'admin'
+        : email.toLowerCase().includes('kurir') || email.toLowerCase().includes('courier')
+        ? 'courier'
+        : 'customer');
 
     const loggedInUser: T.RegisterResponse = {
       id: Math.floor(1000 + Math.random() * 9000),
@@ -65,6 +73,7 @@ function App() {
 
   const handleLogout = () => {
     localStorage.removeItem('token');
+    setAuthToken(null);
     setCurrentUser(null);
     setCurrentScreen('Login');
     setPrepopulatedResi('');

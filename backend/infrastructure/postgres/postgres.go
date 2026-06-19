@@ -36,9 +36,17 @@ func Open() (*gorm.DB, error) {
 	)
 
 	dsn := BuildDSN()
-	db, err := gorm.Open(gormpostgres.Open(dsn), &gorm.Config{
-		Logger: logger.Default.LogMode(logger.Info),
-	})
+	db, err := gorm.Open(
+    gormpostgres.New(
+        gormpostgres.Config{
+            DSN: dsn,
+            PreferSimpleProtocol: true,
+        },
+    ),
+    &gorm.Config{
+        Logger: logger.Default.LogMode(logger.Info),
+    },
+)
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to PostgreSQL: %w", err)
 	}
