@@ -9,3 +9,7 @@ vendor/
 *.exe
 .kiro/
 docs/
+node_modules/
+.git/
+build/
+dist/
