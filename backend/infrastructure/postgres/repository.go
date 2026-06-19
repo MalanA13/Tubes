@@ -57,9 +57,9 @@ type ShipmentRepository struct {
 // NewShipmentRepository creates a new repository and runs AutoMigrate.
 func NewShipmentRepository(db *gorm.DB) (*ShipmentRepository, error) {
 	repo := &ShipmentRepository{db: db}
-	if err := repo.migrate(); err != nil {
-		return nil, fmt.Errorf("failed to migrate PostgreSQL schema: %w", err)
-	}
+	// if err := repo.migrate(); err != nil {
+	// 	return nil, fmt.Errorf("failed to migrate PostgreSQL schema: %w", err)
+	// }
 	return repo, nil
 }
 
